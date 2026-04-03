@@ -1,0 +1,18 @@
+# Database (personal data — don't commit)
+*.db
+*.db-shm
+*.db-wal
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+
+# Generated exports
+*.csv
+
+# OS
+.DS_Store
