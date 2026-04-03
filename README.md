@@ -223,5 +223,5 @@ job-search-automator/
 - LinkedIn scraping uses their unauthenticated guest API; it may break if LinkedIn changes their HTML structure
   
 ## Author
-- Adem Garic — SDET / QA Engineer 4+ years in mobile and web test automation (Appium, Selenium, Jenkins, BrowserStack) LinkedIn · GitHub
+- Adem Garic — SDET / QA Engineer 4+ years in mobile and web test automation (Appium, Selenium, Jenkins, BrowserStack) [LinkedIn](https://www.linkedin.com/in/adem-garic-sdet-qa/) · [GitHub](https://github.com/ademdeniz)
   
