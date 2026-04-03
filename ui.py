@@ -227,14 +227,40 @@ if page == "📋 Job Board":
 
                     # ── Tailor resume + cover letter ──────────────────────
                     has_desc = bool(job.get("description"))
+                    manual_key = f"manual_desc_{job['id']}"
+
                     if not has_desc:
-                        st.caption("⚠️ No description — fetch it first to enable tailoring.")
+                        st.caption("No description — paste one below to enable tailoring.")
+                        manual_desc = st.text_area(
+                            "Paste job description",
+                            key=manual_key,
+                            height=160,
+                            placeholder="Copy the full job description from the job board and paste it here…",
+                        )
+                        # Save it to DB so future actions use it too
+                        if manual_desc and st.button("💾 Save description", key=f"save_desc_{job['id']}"):
+                            from storage.database import update_description
+                            update_description(job["id"], manual_desc)
+                            st.success("Description saved.")
+                            st.rerun()
+                    else:
+                        manual_desc = ""
+
+                    tailor_desc = job.get("description") or st.session_state.get(manual_key, "")
+                    can_tailor  = bool(tailor_desc.strip())
+
                     if st.button(
                         "✍️ Tailor Resume + Cover Letter",
                         key=f"tailor_{job['id']}",
-                        disabled=not has_desc,
+                        disabled=not can_tailor,
                         type="primary",
                     ):
+                        # If description came from the text area (not yet in DB),
+                        # temporarily save it so the CLI subprocess can read it.
+                        if not has_desc and tailor_desc:
+                            from storage.database import update_description
+                            update_description(job["id"], tailor_desc)
+
                         with st.spinner(f"Claude is tailoring your resume for {job['company']}… (30–60 sec)"):
                             out = run_cli(["main.py", "tailor", str(job["id"])])
                         st.code(out)
