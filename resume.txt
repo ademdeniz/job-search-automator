@@ -1,0 +1,56 @@
+ADEM GARIC (He/Him)
+Erie, PA 16509 · (814) 566-2086 · ademdenizgaric@gmail.com
+LinkedIn: linkedin.com/in/adem-garic-sdet-qa
+
+QA Tester | iOS & Agile Testing Expert | Release Control & Risk Management
+
+SUMMARY
+QA Tester with 4+ years of hands-on experience in Agile environments, including 3+ years specifically in iOS mobile testing. Skilled in test planning, component testing, release control, and risk management. Adept at leading structured walkthroughs, tracking issues, and mentoring junior testers. Designed and maintained test environments and integrated testing into CI/CD pipelines using Jenkins, Appium, and cloud device farms. Known for clear documentation, excellent communication skills, and consistent alignment with business and technical goals.
+
+CORE SKILLS
+- Test Execution & Automation: Appium 2, Selenium/WebDriver, TestNG, Page Object Model
+- Mobile Testing: iOS & Android platforms, Xcode, Android Studio, Simulators/Emulators, TestFlight
+- Cloud Testing: BrowserStack (App Automate/App Live), AWS Device Farm, Bitrise
+- CI/CD & DevOps: Jenkins, Gradle, Bitrise, Docker, AWS CLI
+- Process & Reporting: Entry/Exit Criteria, Acceptance Criteria, Risk Management, ExtentReports
+- APIs & Data: Postman, Newman, REST, JSON, SQL (MySQL/SQL Server)
+- Defect Tracking & Team Collaboration: JIRA, TestRail, QMetry, Confluence
+- Soft Skills: Clear communication, mentorship, stakeholder coordination, decision support
+
+PROFESSIONAL EXPERIENCE
+
+Mid Software Development Engineer in Test (SDET)
+Ontraport – Remote | Feb 2024 – Present
+- Built a production-ready Jenkins pipeline for iOS/Android test execution on BrowserStack; integrated video logs, network traces, and reporting.
+- Developed a TestSpec for Appium 2 execution on AWS Device Farm; handled capability normalization and environment setup.
+- Created a unified test entry point for local and cloud testing to ensure consistent test behavior.
+- Authored an executive-ready comparison of cloud device platforms with insights on cost, operations, and testing readiness.
+
+Mid Software Development Engineer in Test (SDET)
+Ontraport – Remote | Oct 2022 – Nov 2023
+- Led test planning, entry/exit criteria definition, and defect triage processes.
+- Maintained Selenium-based frameworks; introduced structured regression and smoke testing.
+- Oversaw test environment setup and aligned QA processes with Agile team needs.
+- Participated in code reviews and supported cross-team QA process improvements.
+
+QA Analyst / Automation Engineer
+Mersys LLC – Remote | Aug 2019 – Sep 2022
+- Executed component, assembly, and product tests; authored detailed test models and acceptance criteria.
+- Automated API test cases with Postman and Newman; boosted coverage and test consistency.
+- Collaborated with users to ensure testing addressed business needs and reduced defect rates.
+- Supported team training, walkthroughs, and task management to strengthen QA operations.
+
+EDUCATION
+M.S., Information Technology (In Progress) — University of the People | 2025–Present
+B.A., Theology/Theological Studies — University of Sarajevo | 2006–2011
+
+CERTIFICATIONS
+- Prompt Engineering Specialization — Vanderbilt (2024)
+- ChatGPT Advanced Data Analysis — Vanderbilt (2024)
+- LambdaTest Software Testing Professional — LinkedIn (2024)
+- AI-Powered Testing — Tecno Study (2023)
+- CompTIA CySA+ — LinkedIn Learning (2023)
+- BDD with Cucumber & Serenity — Serenity Dojo (2023)
+
+LANGUAGES
+English (fluent) · Bosnian (native) · Arabic (elementary)
