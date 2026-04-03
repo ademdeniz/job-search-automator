@@ -122,25 +122,27 @@ def _parse_from_link(page, link, href: str) -> Job:
         if not card_text:
             return None
 
+        # Dice card structure (observed):
+        # line 0: Company name
+        # line 1: "Easy Apply" (optional badge — skip)
+        # line 2: Job title
+        # line 3: Location
+        # line 4: "•"
+        # line 5: "Today" / "X days ago"
+        # line 6+: Description snippet
+        SKIP = {"easy apply", "•", "today", "new", "promoted"}
+
         lines = [l.strip() for l in card_text.strip().splitlines() if l.strip()]
+        meaningful = [l for l in lines if l.lower() not in SKIP and not l.lower().startswith("days ago")]
 
-        # Heuristic: title is typically the first ALL-CAPS or title-cased line
-        # after the company name; company is usually first
-        title, company, location, snippet = "", "", "", ""
+        company  = meaningful[0] if len(meaningful) > 0 else ""
+        title    = meaningful[1] if len(meaningful) > 1 else ""
+        location = meaningful[2] if len(meaningful) > 2 else ""
+        snippet  = meaningful[3] if len(meaningful) > 3 else ""
 
-        for i, line in enumerate(lines):
-            if not company and len(line) > 2 and not any(x in line.lower() for x in ("easy apply", "today", "days ago", "•")):
-                company = line
-                continue
-            if not title and len(line) > 3 and not any(x in line.lower() for x in ("easy apply", "today", "days ago", "•", "$")):
-                title = line
-                continue
-            if not location and any(x in line.lower() for x in ("remote", "hybrid", ",", "united states")):
-                location = line
-                continue
-            if len(line) > 30 and not snippet:
-                snippet = line
-                break
+        # If title looks like a badge/CTA, it's mis-parsed — skip
+        if not title or title.lower() in ("apply now", "easy apply", "new", "promoted"):
+            return None
 
         if not title:
             return None
