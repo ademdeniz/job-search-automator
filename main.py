@@ -49,7 +49,8 @@ MATCH_EMOJI = {"excellent": "★★★★", "good": "★★★ ", "fair": "★�
 # ---------------------------------------------------------------------------
 
 def cmd_scrape(args):
-    keywords: List[str] = args.keywords
+    # Flatten: "sdet qa appium" passed as one quoted string → split into individual terms
+    keywords: List[str] = [w for phrase in args.keywords for w in phrase.split()]
     location: str = args.location
     sources: List[str] = args.sources or list(SCRAPERS.keys())
     max_results: int = args.max_results
