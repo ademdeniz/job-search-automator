@@ -33,12 +33,18 @@ from scrapers.remoteok import RemoteOKScraper
 from scrapers.indeed import IndeedScraper
 from scrapers.linkedin import LinkedInScraper
 from scrapers.weworkremotely import WeWorkRemotelyScraper
+from scrapers.dice import DiceScraper
+from scrapers.greenhouse import GreenhouseScraper
+from scrapers.lever import LeverScraper
 
 SCRAPERS = {
-    "remoteok": RemoteOKScraper,
-    "indeed": IndeedScraper,
-    "linkedin": LinkedInScraper,
+    "remoteok":       RemoteOKScraper,
+    "indeed":         IndeedScraper,
+    "linkedin":       LinkedInScraper,
     "weworkremotely": WeWorkRemotelyScraper,
+    "dice":           DiceScraper,
+    "greenhouse":     GreenhouseScraper,
+    "lever":          LeverScraper,
 }
 
 VALID_STATUSES = {"new", "applied", "rejected", "interviewing", "offer"}
