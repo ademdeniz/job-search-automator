@@ -221,3 +221,7 @@ job-search-automator/
 - `jobs.db` is excluded from git (see `.gitignore`) — it contains your personal job data
 - Scoring costs ~$0.001 per job using Claude Haiku — scoring 100 jobs costs roughly $0.10
 - LinkedIn scraping uses their unauthenticated guest API; it may break if LinkedIn changes their HTML structure
+  
+## Author
+- Adem Garic — SDET / QA Engineer 4+ years in mobile and web test automation (Appium, Selenium, Jenkins, BrowserStack) LinkedIn · GitHub
+  
