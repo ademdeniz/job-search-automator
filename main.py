@@ -27,7 +27,7 @@ from typing import List
 from storage.database import (
     init_db, save_jobs, get_all_jobs, get_job_by_id,
     get_unscored_jobs, get_jobs_without_description,
-    update_description, save_score, update_status, stats,
+    update_description, save_score, update_status, stats, clear_jobs,
 )
 from scrapers.remoteok import RemoteOKScraper
 from scrapers.indeed import IndeedScraper
@@ -316,6 +316,11 @@ def cmd_export(args):
     print(f"Exported {len(jobs)} job(s) to {os.path.abspath(output_path)}")
 
 
+def cmd_clear(args):
+    n = clear_jobs()
+    print(f"Cleared {n} job(s) from the database.")
+
+
 def cmd_stats(args):
     s = stats()
     print(f"Total jobs: {s['total']}\n")
@@ -408,6 +413,9 @@ def build_parser() -> argparse.ArgumentParser:
     p_status.add_argument("job_id", type=int)
     p_status.add_argument("new_status", choices=list(VALID_STATUSES))
 
+    # --- clear ---
+    sub.add_parser("clear", help="Delete all jobs from the database.")
+
     return parser
 
 
@@ -426,6 +434,7 @@ def main():
         "export": cmd_export,
         "stats":  cmd_stats,
         "status": cmd_status,
+        "clear":  cmd_clear,
     }
     commands[args.command](args)
 

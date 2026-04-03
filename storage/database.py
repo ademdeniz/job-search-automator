@@ -144,6 +144,16 @@ def get_unscored_jobs() -> List[dict]:
     return [dict(r) for r in rows]
 
 
+def clear_jobs() -> int:
+    """Delete all jobs. Returns count of deleted rows."""
+    conn = get_connection()
+    n = conn.execute("SELECT COUNT(*) FROM jobs").fetchone()[0]
+    conn.execute("DELETE FROM jobs")
+    conn.commit()
+    conn.close()
+    return n
+
+
 def stats() -> dict:
     conn = get_connection()
     total     = conn.execute("SELECT COUNT(*) FROM jobs").fetchone()[0]
