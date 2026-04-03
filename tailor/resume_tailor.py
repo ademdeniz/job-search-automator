@@ -45,6 +45,7 @@ TAILOR_SYSTEM = textwrap.dedent("""
     - Add a short 2-3 line "Target Role" summary at the very top tailored to this specific job.
     - Keep formatting simple: section headers in ALL CAPS, bullets starting with "- ".
     - Preserve the candidate's actual dates, companies, and titles exactly.
+    - Always include the GitHub link (github.com/ademdeniz) in the contact header — it is a portfolio showcase.
 
     Rules for the COVER LETTER:
     - Address it to "Hiring Manager" (we don't know the name).
