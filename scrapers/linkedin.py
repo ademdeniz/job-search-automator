@@ -1,112 +1,140 @@
-import re
-import html
+"""
+LinkedIn job scraper using Playwright (headless Chromium).
+
+Replaces the old regex-based approach which broke whenever LinkedIn
+changed their HTML structure. Playwright renders the full page so
+we get reliable, structured data from the guest-accessible job search.
+"""
+
 import time
-import requests
 from typing import List
 from urllib.parse import urlencode
+
 from models.job import Job
 from .base import BaseScraper
 
-SEARCH_URL = "https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search"
+
+SEARCH_URL = "https://www.linkedin.com/jobs/search/"
 
 
 class LinkedInScraper(BaseScraper):
-    """
-    Scrapes LinkedIn's unauthenticated guest job search API.
-    Returns HTML fragments — we parse them with regex to avoid a heavy
-    dependency on BeautifulSoup (add it if you want richer parsing).
-    """
+    """Scrapes LinkedIn job search using a headless Chromium browser."""
 
     def scrape(self) -> List[Job]:
-        jobs: List[Job] = []
-        start = 0
-        batch = 25
+        try:
+            from playwright.sync_api import sync_playwright, TimeoutError as PWTimeout
+        except ImportError:
+            print("[LinkedIn] playwright not installed. Run: pip3 install playwright && python3 -m playwright install chromium")
+            return []
 
-        while len(jobs) < self.max_results:
-            params = {
-                "keywords": self._build_query(),
-                "location": self.location,
-                "start": start,
-                "count": batch,
-                "f_TPR": "r86400",   # posted in last 24 h
-            }
-            url = f"{SEARCH_URL}?{urlencode(params)}"
-            headers = {
-                "User-Agent": (
+        jobs: List[Job] = []
+
+        params = {
+            "keywords": self._build_query(),
+            "location": self.location or "Worldwide",
+            "f_TPR": "r604800",   # posted in last 7 days
+            "position": 1,
+            "pageNum": 0,
+        }
+        url = f"{SEARCH_URL}?{urlencode(params)}"
+
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch(headless=True)
+            context = browser.new_context(
+                user_agent=(
                     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
                     "AppleWebKit/537.36 (KHTML, like Gecko) "
                     "Chrome/120.0.0.0 Safari/537.36"
                 ),
-            }
+                viewport={"width": 1280, "height": 800},
+            )
+            page = context.new_page()
 
             try:
-                resp = requests.get(url, headers=headers, timeout=15)
-                resp.raise_for_status()
-            except requests.RequestException as e:
-                print(f"[LinkedIn] Request failed (start={start}): {e}")
-                break
+                page.goto(url, wait_until="domcontentloaded", timeout=30000)
+            except PWTimeout:
+                print("[LinkedIn] Page load timed out.")
+                browser.close()
+                return []
 
-            body = resp.text
-            if not body.strip():
-                break  # no more results
+            # LinkedIn lazy-loads cards — scroll to trigger them
+            for _ in range(3):
+                page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                time.sleep(1.5)
 
-            batch_jobs = _parse_linkedin_html(body)
-            if not batch_jobs:
-                break
+            # Collect cards, clicking "Show more" to paginate
+            while len(jobs) < self.max_results:
+                cards = page.query_selector_all("ul.jobs-search__results-list > li")
+                if not cards:
+                    cards = page.query_selector_all(".base-card")
 
-            jobs.extend(batch_jobs)
-            start += batch
-            time.sleep(1)  # be polite
+                for card in cards:
+                    if len(jobs) >= self.max_results:
+                        break
+                    job = _parse_card(card)
+                    if job:
+                        jobs.append(job)
 
-        jobs = jobs[: self.max_results]
-        print(f"[LinkedIn] Found {len(jobs)} jobs.")
-        return jobs
+                # Try to load more results
+                try:
+                    see_more = page.query_selector("button.infinite-scroller__show-more-button")
+                    if see_more and see_more.is_visible():
+                        see_more.click()
+                        time.sleep(2)
+                        page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                        time.sleep(1.5)
+                    else:
+                        break
+                except Exception:
+                    break
+
+            browser.close()
+
+        # Deduplicate by URL within this batch
+        seen, unique = set(), []
+        for j in jobs:
+            if j.url not in seen:
+                seen.add(j.url)
+                unique.append(j)
+
+        print(f"[LinkedIn] Found {len(unique)} jobs.")
+        return unique
 
 
-# ---------------------------------------------------------------------------
-# Minimal HTML parser using regex (works on LinkedIn's guest API fragments)
-# ---------------------------------------------------------------------------
+def _parse_card(card) -> Job:
+    """Extract a Job from a single LinkedIn job card element."""
+    try:
+        title_el    = card.query_selector("h3.base-search-card__title")
+        company_el  = card.query_selector("h4.base-search-card__subtitle")
+        location_el = card.query_selector("span.job-search-card__location")
+        link_el     = card.query_selector("a.base-card__full-link")
+        date_el     = card.query_selector("time")
 
-_CARD_RE = re.compile(
-    r'<li[^>]*class="[^"]*result-card[^"]*"[^>]*>(.*?)</li>',
-    re.DOTALL,
-)
-_TITLE_RE = re.compile(r'class="[^"]*job-result-card__title[^"]*"[^>]*>([^<]+)<', re.DOTALL)
-_COMPANY_RE = re.compile(r'class="[^"]*job-result-card__subtitle[^"]*"[^>]*>([^<]+)<', re.DOTALL)
-_LOCATION_RE = re.compile(r'class="[^"]*job-result-card__location[^"]*"[^>]*>([^<]+)<', re.DOTALL)
-_LINK_RE = re.compile(r'href="(https://www\.linkedin\.com/jobs/view/[^"?]+)', re.DOTALL)
-_DATE_RE = re.compile(r'<time[^>]*datetime="([^"]+)"', re.DOTALL)
+        title    = _text(title_el)
+        company  = _text(company_el)
+        location = _text(location_el)
+        url      = link_el.get_attribute("href").split("?")[0] if link_el else ""
+        date     = date_el.get_attribute("datetime") if date_el else ""
 
+        if not title or not url:
+            return None
 
-def _parse_linkedin_html(body: str) -> List[Job]:
-    jobs = []
-    for card_match in _CARD_RE.finditer(body):
-        card = card_match.group(1)
-        title = _first(re.search(_TITLE_RE, card))
-        company = _first(re.search(_COMPANY_RE, card))
-        location = _first(re.search(_LOCATION_RE, card))
-        link = _first(re.search(_LINK_RE, card))
-        date = _first(re.search(_DATE_RE, card))
+        remote = "remote" in location.lower()
 
-        if not title or not link:
-            continue
-
-        remote = "remote" in (location or "").lower()
-
-        jobs.append(Job(
-            title=html.unescape(title.strip()),
-            company=html.unescape(company.strip()) if company else "Unknown",
-            location=html.unescape(location.strip()) if location else "Unknown",
+        return Job(
+            title=title,
+            company=company or "Unknown",
+            location=location or "Unknown",
             source="linkedin",
-            url=link,
+            url=url,
             remote=remote,
             posted_date=date,
-        ))
+        )
+    except Exception:
+        return None
 
-    return jobs
 
-
-def _first(match) -> str:
-    if match is None:
+def _text(el) -> str:
+    if el is None:
         return ""
-    return match.group(1) if match.lastindex else ""
+    return (el.inner_text() or "").strip()

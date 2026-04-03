@@ -3,7 +3,7 @@
 Job Search Automator — CLI entry point.
 
 Usage examples:
-  python main.py scrape --keywords "appium sdet" --location "Remote" --sources remoteok indeed linkedin
+  python main.py scrape --keywords "appium sdet" --location "Remote" --sources remoteok indeed linkedin weworkremotely
   python main.py score
   python main.py score --all
   python main.py score --id 42
@@ -30,11 +30,13 @@ from storage.database import (
 from scrapers.remoteok import RemoteOKScraper
 from scrapers.indeed import IndeedScraper
 from scrapers.linkedin import LinkedInScraper
+from scrapers.weworkremotely import WeWorkRemotelyScraper
 
 SCRAPERS = {
     "remoteok": RemoteOKScraper,
     "indeed": IndeedScraper,
     "linkedin": LinkedInScraper,
+    "weworkremotely": WeWorkRemotelyScraper,
 }
 
 VALID_STATUSES = {"new", "applied", "rejected", "interviewing", "offer"}
