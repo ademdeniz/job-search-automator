@@ -1,5 +1,6 @@
 import time
 import requests
+from datetime import datetime, timezone
 from typing import List
 from models.job import Job
 from .base import BaseScraper
@@ -46,6 +47,18 @@ class RemoteOKScraper(BaseScraper):
                 loc_field = (post.get("location") or "").lower()
                 if loc_filter not in loc_field:
                     continue
+
+            # Date filter — RemoteOK `date` is a Unix timestamp (int or str)
+            cutoff = self._cutoff()
+            if cutoff is not None:
+                raw_epoch = post.get("epoch") or post.get("date")
+                try:
+                    epoch = int(raw_epoch)
+                    posted_dt = datetime.fromtimestamp(epoch, tz=timezone.utc)
+                    if posted_dt < cutoff:
+                        continue
+                except (TypeError, ValueError):
+                    pass
 
             salary = None
             sal_min = post.get("salary_min")

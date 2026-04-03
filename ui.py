@@ -327,6 +327,13 @@ elif page == "🔧 Actions":
                 default=["linkedin", "indeed", "remoteok", "weworkremotely", "greenhouse", "lever"],
             )
             max_results = st.slider("Max results per source", 10, 100, 50, step=10)
+            freshness = st.select_slider(
+                "Posted within",
+                options=["Any time", "7 days", "3 days", "24 hours"],
+                value="7 days",
+            )
+            days_ago_map = {"Any time": None, "7 days": 7, "3 days": 3, "24 hours": 1}
+            days_ago = days_ago_map[freshness]
 
         fresh_search = st.checkbox(
             "🗑️ Fresh search — clear all existing jobs first",
@@ -350,6 +357,7 @@ elif page == "🔧 Actions":
                 src_args_remote = ["--sources"] + sources_input
                 src_args_erie   = ["--sources"] + [s for s in ERIE_SOURCES if s in sources_input]
                 max_args = ["--max-results", str(max_results)]
+                days_args = ["--days-ago", str(days_ago)] if days_ago else []
 
                 # ── remote pass ───────────────────────────────────────────
                 if location_mode in ("🌐 Remote only", "🔀 Both"):
@@ -360,6 +368,7 @@ elif page == "🔧 Actions":
                             + ["--location", "Remote"]
                             + src_args_remote
                             + max_args
+                            + days_args
                         )
                     output_lines.append("── Remote pass ──\n" + out)
 
@@ -374,6 +383,7 @@ elif page == "🔧 Actions":
                                 + ["--location", "Erie, PA"]
                                 + src_args_erie
                                 + max_args
+                                + days_args
                             )
                         output_lines.append("── Erie PA pass ──\n" + out)
                     else:
