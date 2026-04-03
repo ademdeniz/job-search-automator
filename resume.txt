@@ -1,44 +1,53 @@
 ADEM GARIC (He/Him)
-Erie, PA 16509 · (814) 566-2086 · ademdenizgaric@gmail.com
+Erie, PA 16509 · ademdenizgaric@gmail.com
 LinkedIn: linkedin.com/in/adem-garic-sdet-qa
 
-QA Tester | iOS & Agile Testing Expert | Release Control & Risk Management
+SDET | QA Engineer | QA Analyst | Test Automation Engineer | Manual Tester | Mobile & AI Testing
+Open to: Remote roles (preferred) OR Erie, PA local/hybrid (in-office or hybrid)
 
 SUMMARY
-QA Tester with 4+ years of hands-on experience in Agile environments, including 3+ years specifically in iOS mobile testing. Skilled in test planning, component testing, release control, and risk management. Adept at leading structured walkthroughs, tracking issues, and mentoring junior testers. Designed and maintained test environments and integrated testing into CI/CD pipelines using Jenkins, Appium, and cloud device farms. Known for clear documentation, excellent communication skills, and consistent alignment with business and technical goals.
+Mid-level SDET with 6+ years of experience in test automation, mobile testing, and CI/CD integration. Built Appium-based mobile automation frameworks from scratch for iOS and Android. Deep expertise in Java, Selenium, Appium 2, TestNG, Cucumber, Jenkins, BrowserStack, and AWS Device Farm. Experienced in API testing (Postman, RestAssured), BDD, Page Object Model, and Agile/Waterfall environments. Explored AI-driven testing enhancements including proof-of-concept AI testing agents.
 
 CORE SKILLS
-- Test Execution & Automation: Appium 2, Selenium/WebDriver, TestNG, Page Object Model
-- Mobile Testing: iOS & Android platforms, Xcode, Android Studio, Simulators/Emulators, TestFlight
+- Test Automation: Java, Selenium/WebDriver, Appium 2, TestNG, Cucumber (BDD), Page Object Model, RestAssured
+- Mobile Testing: iOS & Android, Xcode, Android Studio, Simulators/Emulators, TestFlight, Appium
 - Cloud Testing: BrowserStack (App Automate/App Live), AWS Device Farm, Bitrise
-- CI/CD & DevOps: Jenkins, Gradle, Bitrise, Docker, AWS CLI
-- Process & Reporting: Entry/Exit Criteria, Acceptance Criteria, Risk Management, ExtentReports
-- APIs & Data: Postman, Newman, REST, JSON, SQL (MySQL/SQL Server)
-- Defect Tracking & Team Collaboration: JIRA, TestRail, QMetry, Confluence
-- Soft Skills: Clear communication, mentorship, stakeholder coordination, decision support
+- CI/CD & DevOps: Jenkins, Maven, Gradle, Bitrise, Docker, AWS CLI, TeamCity, GitHub Actions
+- APIs & Data: Postman, Newman, RestAssured, REST, JSON, SQL (MySQL/SQL Server), JDBC
+- Defect Tracking: JIRA, TestRail, QMetry, Confluence, ZenDesk
+- Process: Entry/Exit Criteria, Acceptance Criteria, Risk Management, Regression/Smoke Testing, BDD
+- AI Testing: AI-assisted testing agents (PoC), AI-powered test failure analysis
 
 PROFESSIONAL EXPERIENCE
 
 Mid Software Development Engineer in Test (SDET)
-Ontraport – Remote | Feb 2024 – Present
+Ontraport – Remote | Feb 2024 – Apr 2026
+- Designed and built a scalable Appium-based mobile automation framework from scratch for iOS and Android; evolved from PoC into a standalone project enabling consistent CI test runs.
+- Automated 20+ high-priority smoke and regression test cases for the Inbox Mobile product (SMS and Email), reducing reliance on manual QA and improving release confidence.
 - Built a production-ready Jenkins pipeline for iOS/Android test execution on BrowserStack; integrated video logs, network traces, and reporting.
 - Developed a TestSpec for Appium 2 execution on AWS Device Farm; handled capability normalization and environment setup.
-- Created a unified test entry point for local and cloud testing to ensure consistent test behavior.
-- Authored an executive-ready comparison of cloud device platforms with insights on cost, operations, and testing readiness.
+- Improved test stability by refining locator strategies, synchronization logic, and POM-aligned reusable components — significantly reducing flaky tests in CI.
+- Performed API testing using RestAssured and Postman, validating backend integrations and strengthening end-to-end coverage.
+- Developed a proof of concept for an AI-assisted testing agent to reduce maintenance overhead and accelerate failure analysis.
+- Authored an executive-ready comparison of cloud device platforms (BrowserStack vs AWS Device Farm vs others) with cost, operations, and testing readiness analysis.
 
 Mid Software Development Engineer in Test (SDET)
 Ontraport – Remote | Oct 2022 – Nov 2023
 - Led test planning, entry/exit criteria definition, and defect triage processes.
-- Maintained Selenium-based frameworks; introduced structured regression and smoke testing.
-- Oversaw test environment setup and aligned QA processes with Agile team needs.
-- Participated in code reviews and supported cross-team QA process improvements.
+- Optimized the automated testing stack using Java and Selenium; spearheaded adoption of automated Regression and Smoke testing.
+- Developed and implemented automated test procedures using Cucumber and TestNG following POM best practices.
+- Managed regression testing cycles with Selenium Grid and Jenkins.
+- Conducted code reviews using Git/GitHub; participated in Agile and Waterfall ceremonies.
+- Led creation of test plans and test cases in QMetry; ensured comprehensive coverage and defect-free delivery.
 
 QA Analyst / Automation Engineer
 Mersys LLC – Remote | Aug 2019 – Sep 2022
-- Executed component, assembly, and product tests; authored detailed test models and acceptance criteria.
-- Automated API test cases with Postman and Newman; boosted coverage and test consistency.
-- Collaborated with users to ensure testing addressed business needs and reduced defect rates.
-- Supported team training, walkthroughs, and task management to strengthen QA operations.
+- Built test automation using Java, Selenium, TestNG, and Cucumber in an SDET role.
+- Implemented Cucumber for BDD, improving collaboration between technical and business teams.
+- Automated API test cases with Postman and Newman; managed comprehensive regression testing.
+- Conducted MySQL database testing, augmenting data integrity and backend proficiency.
+- Used Maven for build optimization and Jenkins for CI/CD, speeding up deployment cycles.
+- Led defect management using JIRA; authored QA optimization guides.
 
 EDUCATION
 M.S., Information Technology (In Progress) — University of the People | 2025–Present

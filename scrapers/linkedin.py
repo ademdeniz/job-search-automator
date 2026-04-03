@@ -165,6 +165,7 @@ def fetch_descriptions(jobs: list, on_progress=None) -> List[tuple]:
 
         for i, job in enumerate(jobs, 1):
             desc = ""
+            print(f"  [{i:>3}/{total}] Fetching: {job['title'][:50]}", flush=True)
             try:
                 page.goto(job["url"], wait_until="domcontentloaded", timeout=20000)
                 time.sleep(1)
@@ -196,6 +197,8 @@ def fetch_descriptions(jobs: list, on_progress=None) -> List[tuple]:
             except Exception as e:
                 print(f"  [fetch] Error on job {job['id']}: {e}")
 
+            status = f"{len(desc)} chars" if desc else "no description"
+            print(f"           → {status}", flush=True)
             results.append((job["id"], desc))
             if on_progress:
                 on_progress(i, total, job, desc)
