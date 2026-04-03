@@ -72,10 +72,23 @@ def score_badge(score):
 
 
 def run_cli(cmd: list[str]) -> str:
+    env = os.environ.copy()
+    # Load API key from ~/.zshrc if not already in environment
+    if not env.get("ANTHROPIC_API_KEY"):
+        try:
+            with open(os.path.expanduser("~/.zshrc")) as f:
+                for line in f:
+                    line = line.strip()
+                    if line.startswith("export ANTHROPIC_API_KEY="):
+                        env["ANTHROPIC_API_KEY"] = line.split("=", 1)[1].strip().strip("'\"")
+                        break
+        except Exception:
+            pass
     result = subprocess.run(
         [sys.executable] + cmd,
         capture_output=True, text=True,
         cwd=os.path.dirname(__file__),
+        env=env,
     )
     return (result.stdout + result.stderr).strip()
 
