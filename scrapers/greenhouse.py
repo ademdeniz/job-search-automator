@@ -72,14 +72,17 @@ class GreenhouseScraper(BaseScraper):
                     break
 
                 title = post.get("title", "")
+
+                # Filter on title first (fast) — skip obvious non-matches
+                if query_terms and not any(t in title.lower() for t in query_terms):
+                    continue
+
                 content = post.get("content", "") or ""
+                # Unescape HTML entities then strip tags
+                import html as html_module
+                content = html_module.unescape(content)
                 description = re.sub(r"<[^>]+>", " ", content).strip()
                 description = re.sub(r"\s+", " ", description)
-
-                # Keyword filter on title + description
-                searchable = f"{title} {description}".lower()
-                if query_terms and not any(t in searchable for t in query_terms):
-                    continue
 
                 location_data = post.get("location", {})
                 location = location_data.get("name", "") if location_data else ""
