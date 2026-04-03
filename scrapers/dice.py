@@ -30,9 +30,10 @@ class DiceScraper(BaseScraper):
         jobs: List[Job] = []
         seen_urls = set()
 
+        _posted = {1: "ONE", 3: "THREE", 7: "SEVEN"}.get(self.days_ago, "SEVEN")
         params = {
             "q": self._build_query(),
-            "filters.postedDate": "SEVEN",
+            "filters.postedDate": _posted,
             "language": "en",
         }
         if self.location and self.location.lower() not in ("remote", "anywhere", ""):

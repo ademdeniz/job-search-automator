@@ -30,11 +30,12 @@ class IndeedScraper(BaseScraper):
         jobs: List[Job] = []
         seen_urls = set()
 
+        _fromage = {1: "1", 3: "3", 7: "7"}.get(self.days_ago, "7")
         params = {
             "q": self._build_query(),
             "l": self.location or "Remote",
             "sort": "date",
-            "fromage": "14",  # posted in last 14 days
+            "fromage": _fromage,
         }
         url = f"{SEARCH_URL}?{urlencode(params)}"
 

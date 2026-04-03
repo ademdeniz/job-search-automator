@@ -9,6 +9,7 @@ and query each one, filtering results by keyword.
 """
 
 import requests
+from datetime import datetime, timezone
 from typing import List
 import re
 
@@ -16,6 +17,15 @@ from models.job import Job
 from .base import BaseScraper
 
 API_BASE = "https://api.lever.co/v0/postings/{company}"
+
+# Terms that must appear in the job title — narrower than user keywords to avoid false positives.
+QA_TITLE_TERMS = {
+    "qa", "qe", "sdet", "quality assurance", "quality engineer",
+    "test automation", "automation engineer", "automation tester",
+    "test engineer", "software tester", "quality analyst",
+    "testing engineer", "manual tester", "software quality",
+    "quality control", "qc engineer", "test lead", "qa lead",
+}
 
 # Curated list of companies that use Lever and commonly hire QA/SDET.
 QA_FRIENDLY_COMPANIES = [
@@ -91,9 +101,19 @@ class LeverScraper(BaseScraper):
                 description = re.sub(r"<[^>]+>", " ", raw).strip()
                 description = re.sub(r"\s+", " ", description)
 
-                # Keyword filter
-                searchable = f"{title} {description}".lower()
-                if query_terms and not any(t in searchable for t in query_terms):
+                # Date filter — Lever createdAt is Unix ms
+                cutoff = self._cutoff()
+                if cutoff is not None:
+                    created_ms = post.get("createdAt")
+                    try:
+                        posted_dt = datetime.fromtimestamp(int(created_ms) / 1000, tz=timezone.utc)
+                        if posted_dt < cutoff:
+                            continue
+                    except (TypeError, ValueError):
+                        pass
+
+                # Title must match a QA-specific term — user keywords like "engineer" are too broad
+                if not any(t in title.lower() for t in QA_TITLE_TERMS):
                     continue
 
                 # Location filter

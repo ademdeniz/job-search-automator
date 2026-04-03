@@ -62,6 +62,7 @@ def cmd_scrape(args):
     location: str = args.location
     sources: List[str] = args.sources or list(SCRAPERS.keys())
     max_results: int = args.max_results
+    days_ago: int = args.days_ago
 
     unknown = set(sources) - set(SCRAPERS)
     if unknown:
@@ -70,7 +71,8 @@ def cmd_scrape(args):
 
     all_jobs = []
     for source in sources:
-        scraper = SCRAPERS[source](keywords=keywords, location=location, max_results=max_results)
+        scraper = SCRAPERS[source](keywords=keywords, location=location,
+                                   max_results=max_results, days_ago=days_ago)
         jobs = scraper.scrape()
         all_jobs.extend(jobs)
 
@@ -363,6 +365,9 @@ def build_parser() -> argparse.ArgumentParser:
                           help="Which sources to scrape (default: all)")
     p_scrape.add_argument("--max-results", type=int, default=50, dest="max_results",
                           help="Max results per source (default: 50)")
+    p_scrape.add_argument("--days-ago", type=int, default=None, dest="days_ago",
+                          choices=[1, 3, 7],
+                          help="Only include jobs posted within N days (1, 3, or 7)")
 
     # --- fetch ---
     p_fetch = sub.add_parser("fetch", help="Fetch full descriptions for jobs missing them (uses headless browser).")

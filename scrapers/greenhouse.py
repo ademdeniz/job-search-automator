@@ -17,6 +17,16 @@ from .base import BaseScraper
 
 API_BASE = "https://boards-api.greenhouse.io/v1/boards/{company}/jobs"
 
+# Terms that must appear in the job title for it to be considered a QA/SDET role.
+# Deliberately narrow — "engineer" alone is too broad and matches hundreds of unrelated roles.
+QA_TITLE_TERMS = {
+    "qa", "qe", "sdet", "quality assurance", "quality engineer",
+    "test automation", "automation engineer", "automation tester",
+    "test engineer", "software tester", "quality analyst",
+    "testing engineer", "manual tester", "software quality",
+    "quality control", "qc engineer", "test lead", "qa lead",
+}
+
 # Curated list of tech companies that use Greenhouse and commonly hire QA/SDET.
 # Add more company slugs here as needed.
 QA_FRIENDLY_COMPANIES = [
@@ -73,8 +83,14 @@ class GreenhouseScraper(BaseScraper):
 
                 title = post.get("title", "")
 
-                # Filter on title first (fast) — skip obvious non-matches
-                if query_terms and not any(t in title.lower() for t in query_terms):
+                # Filter on title — must match a QA-specific term, not just any keyword.
+                # Using user keywords alone is too broad ("engineer" matches everything).
+                title_lower = title.lower()
+                if not any(t in title_lower for t in QA_TITLE_TERMS):
+                    continue
+
+                # Date filter
+                if not self._is_recent(post.get("updated_at", "")):
                     continue
 
                 content = post.get("content", "") or ""

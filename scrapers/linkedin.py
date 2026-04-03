@@ -29,13 +29,19 @@ class LinkedInScraper(BaseScraper):
 
         jobs: List[Job] = []
 
+        _tpr = {1: "r86400", 3: "r259200", 7: "r604800"}.get(self.days_ago, "r604800")
+        loc = self.location or "Remote"
+        is_remote_search = loc.lower() in ("remote", "anywhere", "")
         params = {
             "keywords": self._build_query(),
-            "location": self.location or "Worldwide",
-            "f_TPR": "r604800",   # posted in last 7 days
+            "location": "United States" if is_remote_search else loc,
+            "f_TPR": _tpr,
+            "f_WT": "2" if is_remote_search else "",   # Work type: Remote
             "position": 1,
             "pageNum": 0,
         }
+        if not is_remote_search:
+            del params["f_WT"]
         url = f"{SEARCH_URL}?{urlencode(params)}"
 
         with sync_playwright() as pw:

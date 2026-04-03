@@ -9,12 +9,22 @@ import html
 import re
 import requests
 import xml.etree.ElementTree as ET
+from email.utils import parsedate_to_datetime
 from typing import List
 from models.job import Job
 from .base import BaseScraper
 
-# All remote dev/QA/ops jobs
-RSS_URL = "https://weworkremotely.com/remote-jobs.rss"
+# Programming/dev/QA jobs only (narrower than the all-jobs feed)
+RSS_URL = "https://weworkremotely.com/categories/remote-programming-jobs.rss"
+
+# QA-specific terms — "test" alone matches too many non-QA roles
+QA_TITLE_TERMS = {
+    "qa", "qe", "sdet", "quality assurance", "quality engineer",
+    "test automation", "automation engineer", "automation tester",
+    "test engineer", "software tester", "quality analyst",
+    "testing engineer", "manual tester", "software quality",
+    "quality control", "qc engineer", "test lead", "qa lead",
+}
 
 
 class WeWorkRemotelyScraper(BaseScraper):
@@ -59,9 +69,18 @@ class WeWorkRemotelyScraper(BaseScraper):
                 re.sub(r"<[^>]+>", "", description_raw or "")
             ).strip()
 
-            # Keyword filter
-            searchable = f"{title} {description}".lower()
-            if query_terms and not any(t in searchable for t in query_terms):
+            # Date filter
+            cutoff = self._cutoff()
+            if cutoff is not None and pub_date:
+                try:
+                    posted_dt = parsedate_to_datetime(pub_date)
+                    if posted_dt < cutoff:
+                        continue
+                except Exception:
+                    pass
+
+            # Must match a QA-specific term in the title (broad keyword match is too noisy)
+            if not any(t in title.lower() for t in QA_TITLE_TERMS):
                 continue
 
             jobs.append(Job(
