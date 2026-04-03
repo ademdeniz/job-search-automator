@@ -115,6 +115,26 @@ def save_score(job_id: int, score: int, reason: str):
     conn.close()
 
 
+def update_description(job_id: int, description: str):
+    conn = get_connection()
+    conn.execute("UPDATE jobs SET description=? WHERE id=?", (description, job_id))
+    conn.commit()
+    conn.close()
+
+
+def get_jobs_without_description(source: Optional[str] = None) -> List[dict]:
+    conn = get_connection()
+    clauses = ["(description IS NULL OR description = '')"]
+    params = []
+    if source:
+        clauses.append("source=?")
+        params.append(source)
+    where = "WHERE " + " AND ".join(clauses)
+    rows = conn.execute(f"SELECT * FROM jobs {where} ORDER BY id", params).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
 def get_unscored_jobs() -> List[dict]:
     conn = get_connection()
     rows = conn.execute(

@@ -134,6 +134,79 @@ def _parse_card(card) -> Job:
         return None
 
 
+def fetch_descriptions(jobs: list, on_progress=None) -> List[tuple]:
+    """
+    Visit each job's LinkedIn URL with a headless browser and extract
+    the full job description.
+
+    Returns list of (job_id, description_text).
+    on_progress(current, total, job) called after each fetch.
+    """
+    try:
+        from playwright.sync_api import sync_playwright, TimeoutError as PWTimeout
+    except ImportError:
+        print("[LinkedIn] playwright not installed.")
+        return []
+
+    results = []
+    total = len(jobs)
+
+    with sync_playwright() as pw:
+        browser = pw.chromium.launch(headless=True)
+        context = browser.new_context(
+            user_agent=(
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/120.0.0.0 Safari/537.36"
+            ),
+            viewport={"width": 1280, "height": 800},
+        )
+        page = context.new_page()
+
+        for i, job in enumerate(jobs, 1):
+            desc = ""
+            try:
+                page.goto(job["url"], wait_until="domcontentloaded", timeout=20000)
+                time.sleep(1)
+
+                # Expand "Show more" if present
+                try:
+                    btn = page.query_selector("button.show-more-less-html__button--more")
+                    if btn and btn.is_visible():
+                        btn.click()
+                        time.sleep(0.5)
+                except Exception:
+                    pass
+
+                # Try multiple selectors LinkedIn uses for job descriptions
+                for selector in [
+                    ".show-more-less-html__markup",
+                    ".description__text",
+                    ".job-details-jobs-unified-top-card__job-insight",
+                    "div[class*='description']",
+                ]:
+                    el = page.query_selector(selector)
+                    if el:
+                        desc = (el.inner_text() or "").strip()
+                        if len(desc) > 100:
+                            break
+
+            except PWTimeout:
+                pass
+            except Exception as e:
+                print(f"  [fetch] Error on job {job['id']}: {e}")
+
+            results.append((job["id"], desc))
+            if on_progress:
+                on_progress(i, total, job, desc)
+
+            time.sleep(1.2)  # polite delay between requests
+
+        browser.close()
+
+    return results
+
+
 def _text(el) -> str:
     if el is None:
         return ""

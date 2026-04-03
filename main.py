@@ -13,6 +13,7 @@ Usage examples:
   python main.py open 42
   python main.py stats
   python main.py status 42 applied
+  python main.py fetch --source linkedin
   python main.py export --output jobs.csv
 """
 
@@ -25,7 +26,8 @@ from typing import List
 
 from storage.database import (
     init_db, save_jobs, get_all_jobs, get_job_by_id,
-    get_unscored_jobs, save_score, update_status, stats,
+    get_unscored_jobs, get_jobs_without_description,
+    update_description, save_score, update_status, stats,
 )
 from scrapers.remoteok import RemoteOKScraper
 from scrapers.indeed import IndeedScraper
@@ -74,6 +76,37 @@ def cmd_scrape(args):
     print(f"\nDone. Saved {inserted} new job(s) (skipped {len(all_jobs) - inserted} duplicate(s)).")
     if inserted:
         print("Run  python main.py score  to rank them against your resume.")
+
+
+def cmd_fetch(args):
+    """Fetch full job descriptions by visiting each job URL with a headless browser."""
+    from scrapers.linkedin import fetch_descriptions
+
+    source = args.source
+    jobs = get_jobs_without_description(source=source)
+
+    if not jobs:
+        print(f"No jobs missing descriptions{' for source: ' + source if source else ''}.")
+        return
+
+    print(f"Fetching descriptions for {len(jobs)} job(s) via headless browser…\n")
+
+    fetched = 0
+
+    def on_progress(current, total, job, desc):
+        status = f"{len(desc)} chars" if desc else "no description found"
+        print(f"  [{current:>3}/{total}] {job['title'][:45]:<45}  {status}")
+
+    results = fetch_descriptions(jobs, on_progress=on_progress)
+
+    for job_id, desc in results:
+        if desc:
+            update_description(job_id, desc)
+            fetched += 1
+
+    print(f"\nDone. Fetched descriptions for {fetched}/{len(jobs)} job(s).")
+    if fetched:
+        print("Run  python main.py score  to score them against your resume.")
 
 
 def cmd_score(args):
@@ -321,6 +354,11 @@ def build_parser() -> argparse.ArgumentParser:
     p_scrape.add_argument("--max-results", type=int, default=50, dest="max_results",
                           help="Max results per source (default: 50)")
 
+    # --- fetch ---
+    p_fetch = sub.add_parser("fetch", help="Fetch full descriptions for jobs missing them (uses headless browser).")
+    p_fetch.add_argument("--source", choices=list(SCRAPERS), default=None,
+                         help="Only fetch for a specific source (default: all)")
+
     # --- score ---
     p_score = sub.add_parser("score", help="Score jobs against your resume using Claude AI.")
     score_grp = p_score.add_mutually_exclusive_group()
@@ -375,6 +413,7 @@ def main():
 
     commands = {
         "scrape": cmd_scrape,
+        "fetch":  cmd_fetch,
         "score":  cmd_score,
         "list":   cmd_list,
         "show":   cmd_show,
