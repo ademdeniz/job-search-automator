@@ -94,8 +94,7 @@ def cmd_fetch(args):
     fetched = 0
 
     def on_progress(current, total, job, desc):
-        status = f"{len(desc)} chars" if desc else "no description found"
-        print(f"  [{current:>3}/{total}] {job['title'][:45]:<45}  {status}")
+        pass  # progress is printed inline by the fetcher
 
     results = fetch_descriptions(jobs, on_progress=on_progress)
 
