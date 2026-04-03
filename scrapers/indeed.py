@@ -1,83 +1,143 @@
+"""
+Indeed job scraper using Playwright (headless Chromium).
+
+Replaces the old RSS-based approach which was unreliable and capped at 25 results.
+Playwright renders the full search page and extracts job cards with descriptions.
+"""
+
 import re
 import html
-import requests
-import xml.etree.ElementTree as ET
+import time
 from typing import List
 from urllib.parse import urlencode
+
 from models.job import Job
 from .base import BaseScraper
 
-RSS_URL = "https://www.indeed.com/rss"
+SEARCH_URL = "https://www.indeed.com/jobs"
 
 
 class IndeedScraper(BaseScraper):
-    """Scrapes Indeed via their public RSS feed."""
+    """Scrapes Indeed job search using a headless Chromium browser."""
 
     def scrape(self) -> List[Job]:
+        try:
+            from playwright.sync_api import sync_playwright, TimeoutError as PWTimeout
+        except ImportError:
+            print("[Indeed] playwright not installed.")
+            return []
+
+        jobs: List[Job] = []
+        seen_urls = set()
+
         params = {
             "q": self._build_query(),
-            "l": self.location,
-            "limit": min(self.max_results, 25),  # RSS caps at 25
+            "l": self.location or "Remote",
             "sort": "date",
+            "fromage": "14",  # posted in last 14 days
         }
-        url = f"{RSS_URL}?{urlencode(params)}"
-        headers = {"User-Agent": "Mozilla/5.0 (compatible; job-search-automator/1.0)"}
+        url = f"{SEARCH_URL}?{urlencode(params)}"
 
-        try:
-            resp = requests.get(url, headers=headers, timeout=15)
-            resp.raise_for_status()
-        except requests.RequestException as e:
-            print(f"[Indeed] Request failed: {e}")
-            return []
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch(headless=True)
+            context = browser.new_context(
+                user_agent=(
+                    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/120.0.0.0 Safari/537.36"
+                ),
+                viewport={"width": 1280, "height": 900},
+            )
+            page = context.new_page()
 
-        try:
-            root = ET.fromstring(resp.content)
-        except ET.ParseError as e:
-            print(f"[Indeed] Failed to parse RSS: {e}")
-            return []
+            try:
+                page.goto(url, wait_until="domcontentloaded", timeout=30000)
+                time.sleep(2)
+            except PWTimeout:
+                print("[Indeed] Page load timed out.")
+                browser.close()
+                return []
 
-        ns = {"dc": "http://purl.org/dc/elements/1.1/"}
-        items = root.findall(".//item")
-        jobs: List[Job] = []
+            page_num = 0
+            while len(jobs) < self.max_results:
+                # Scroll to load all cards
+                page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                time.sleep(1.5)
 
-        for item in items[:self.max_results]:
-            title = _text(item, "title")
-            link = _text(item, "link")
-            description_raw = _text(item, "description")
-            description = html.unescape(re.sub(r"<[^>]+>", "", description_raw or "")).strip()
-            pub_date = _text(item, "pubDate")
-            author = _text(item, "author") or _text(item, "dc:author", ns)
+                cards = page.query_selector_all("div.job_seen_beacon")
+                if not cards:
+                    cards = page.query_selector_all("div.cardOutline")
+                if not cards:
+                    break
 
-            # Indeed RSS encodes "Job Title - Company - Location" in the title
-            company, location = _parse_title_parts(title)
+                for card in cards:
+                    if len(jobs) >= self.max_results:
+                        break
+                    job = _parse_card(card)
+                    if job and job.url and job.url not in seen_urls:
+                        seen_urls.add(job.url)
+                        jobs.append(job)
 
-            remote = any(word in (description or "").lower() for word in ("remote", "work from home", "wfh"))
+                # Try next page
+                try:
+                    next_btn = page.query_selector("a[data-testid='pagination-page-next']")
+                    if not next_btn or not next_btn.is_visible():
+                        break
+                    next_btn.click()
+                    time.sleep(2.5)
+                    page_num += 1
+                    if page_num >= 4:  # max 4 pages
+                        break
+                except Exception:
+                    break
 
-            jobs.append(Job(
-                title=title,
-                company=company or "Unknown",
-                location=location or self.location or "Unknown",
-                source="indeed",
-                url=link,
-                description=description,
-                remote=remote,
-                posted_date=pub_date,
-            ))
+            browser.close()
 
         print(f"[Indeed] Found {len(jobs)} jobs.")
         return jobs
 
 
-def _text(element, tag: str, ns: dict = None) -> str:
-    child = element.find(tag, ns) if ns else element.find(tag)
-    return (child.text or "").strip() if child is not None else ""
+def _parse_card(card) -> Job:
+    try:
+        title_el    = card.query_selector("h2.jobTitle span[title]") or card.query_selector("h2.jobTitle span")
+        company_el  = card.query_selector("span[data-testid='company-name']") or card.query_selector(".companyName")
+        location_el = card.query_selector("div[data-testid='text-location']") or card.query_selector(".companyLocation")
+        link_el     = card.query_selector("a.jcs-JobTitle") or card.query_selector("h2.jobTitle a")
+        salary_el   = card.query_selector("div[data-testid='attribute_snippet_testid']")
+        snippet_el  = card.query_selector("div.job-snippet") or card.query_selector("div[data-testid='jobsnippet_footer']")
+
+        title    = _text(title_el)
+        company  = _text(company_el)
+        location = _text(location_el)
+        salary   = _text(salary_el) if salary_el else None
+        snippet  = _text(snippet_el) if snippet_el else ""
+
+        href = link_el.get_attribute("href") if link_el else ""
+        if href and not href.startswith("http"):
+            href = "https://www.indeed.com" + href
+        # Strip tracking params — keep just the base URL
+        href = href.split("&")[0] if "&" in href else href
+
+        if not title or not href:
+            return None
+
+        remote = any(w in (location + snippet).lower() for w in ("remote", "work from home", "wfh"))
+
+        return Job(
+            title=title,
+            company=company or "Unknown",
+            location=location or "Unknown",
+            source="indeed",
+            url=href,
+            description=snippet,
+            salary=salary,
+            remote=remote,
+        )
+    except Exception:
+        return None
 
 
-def _parse_title_parts(title: str):
-    """Indeed titles are often 'Job Title - Company - Location'."""
-    parts = [p.strip() for p in title.split(" - ")]
-    if len(parts) >= 3:
-        return parts[-2], parts[-1]
-    if len(parts) == 2:
-        return parts[-1], ""
-    return "", ""
+def _text(el) -> str:
+    if el is None:
+        return ""
+    return (el.inner_text() or "").strip()
