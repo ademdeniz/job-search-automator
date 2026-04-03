@@ -255,33 +255,46 @@ if page == "📋 Job Board":
                         disabled=not can_tailor,
                         type="primary",
                     ):
-                        # If description came from the text area (not yet in DB),
-                        # temporarily save it so the CLI subprocess can read it.
+                        # If description came from the text area, save it to DB first
                         if not has_desc and tailor_desc:
                             from storage.database import update_description
                             update_description(job["id"], tailor_desc)
 
                         with st.spinner(f"Claude is tailoring your resume for {job['company']}… (30–60 sec)"):
                             out = run_cli(["main.py", "tailor", str(job["id"])])
-                        st.code(out)
 
-                        # Show download buttons if files were created
+                        # Parse file paths and store in session state so they
+                        # survive rerenders (clicking one download won't lose the other)
                         import re as _re
                         resume_match = _re.search(r"Resume:\s+(.+\.docx)", out)
                         cl_match     = _re.search(r"Cover letter:\s+(.+\.docx)", out)
-                        if resume_match and os.path.exists(resume_match.group(1)):
-                            with open(resume_match.group(1), "rb") as f:
-                                st.download_button(
-                                    "⬇ Download Resume.docx",
+                        key = f"tailor_files_{job['id']}"
+                        st.session_state[key] = {
+                            "resume": resume_match.group(1).strip() if resume_match else None,
+                            "cover_letter": cl_match.group(1).strip() if cl_match else None,
+                            "log": out,
+                        }
+
+                    # ── Show downloads from session state (persists across rerenders) ──
+                    state_key = f"tailor_files_{job['id']}"
+                    if state_key in st.session_state:
+                        files = st.session_state[state_key]
+                        if files.get("log"):
+                            st.code(files["log"])
+                        dl_col1, dl_col2 = st.columns(2)
+                        if files.get("resume") and os.path.exists(files["resume"]):
+                            with open(files["resume"], "rb") as f:
+                                dl_col1.download_button(
+                                    "⬇ Resume.docx",
                                     data=f.read(),
                                     file_name=f"resume_{job['company'].replace(' ', '_')}.docx",
                                     mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                                     key=f"dl_resume_{job['id']}",
                                 )
-                        if cl_match and os.path.exists(cl_match.group(1)):
-                            with open(cl_match.group(1), "rb") as f:
-                                st.download_button(
-                                    "⬇ Download Cover Letter.docx",
+                        if files.get("cover_letter") and os.path.exists(files["cover_letter"]):
+                            with open(files["cover_letter"], "rb") as f:
+                                dl_col2.download_button(
+                                    "⬇ Cover Letter.docx",
                                     data=f.read(),
                                     file_name=f"cover_letter_{job['company'].replace(' ', '_')}.docx",
                                     mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
