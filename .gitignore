@@ -16,3 +16,4 @@ env/
 
 # OS
 .DS_Store
+output/

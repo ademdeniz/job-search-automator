@@ -11,6 +11,7 @@ import sqlite3
 import subprocess
 import webbrowser
 from datetime import datetime
+from pathlib import Path
 
 import streamlit as st
 import pandas as pd
@@ -208,6 +209,45 @@ if page == "📋 Job Board":
                             update_status(job["id"], new_status)
                             st.success(f"Status updated to **{new_status}**")
                             st.rerun()
+
+                    st.divider()
+
+                    # ── Tailor resume + cover letter ──────────────────────
+                    has_desc = bool(job.get("description"))
+                    if not has_desc:
+                        st.caption("⚠️ No description — fetch it first to enable tailoring.")
+                    if st.button(
+                        "✍️ Tailor Resume + Cover Letter",
+                        key=f"tailor_{job['id']}",
+                        disabled=not has_desc,
+                        type="primary",
+                    ):
+                        with st.spinner(f"Claude is tailoring your resume for {job['company']}… (30–60 sec)"):
+                            out = run_cli(["main.py", "tailor", str(job["id"])])
+                        st.code(out)
+
+                        # Show download buttons if files were created
+                        import re as _re
+                        resume_match = _re.search(r"Resume:\s+(.+\.docx)", out)
+                        cl_match     = _re.search(r"Cover letter:\s+(.+\.docx)", out)
+                        if resume_match and os.path.exists(resume_match.group(1)):
+                            with open(resume_match.group(1), "rb") as f:
+                                st.download_button(
+                                    "⬇ Download Resume.docx",
+                                    data=f.read(),
+                                    file_name=f"resume_{job['company'].replace(' ', '_')}.docx",
+                                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                                    key=f"dl_resume_{job['id']}",
+                                )
+                        if cl_match and os.path.exists(cl_match.group(1)):
+                            with open(cl_match.group(1), "rb") as f:
+                                st.download_button(
+                                    "⬇ Download Cover Letter.docx",
+                                    data=f.read(),
+                                    file_name=f"cover_letter_{job['company'].replace(' ', '_')}.docx",
+                                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                                    key=f"dl_cl_{job['id']}",
+                                )
 
 
 # ════════════════════════════════════════════════════════════════════════════

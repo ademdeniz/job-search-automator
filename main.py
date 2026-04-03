@@ -318,6 +318,25 @@ def cmd_export(args):
     print(f"Exported {len(jobs)} job(s) to {os.path.abspath(output_path)}")
 
 
+def cmd_tailor(args):
+    from tailor.resume_tailor import tailor_job
+    job = get_job_by_id(args.job_id)
+    if not job:
+        print(f"No job found with ID {args.job_id}.")
+        sys.exit(1)
+    if not job.get("description"):
+        print(f"Job {args.job_id} has no description. Run 'fetch' first.")
+        sys.exit(1)
+    try:
+        result = tailor_job(job)
+        print(f"\nDone!")
+        print(f"  Resume:       {result.resume_path}")
+        print(f"  Cover letter: {result.cover_letter_path}")
+    except Exception as e:
+        print(f"Error: {e}")
+        sys.exit(1)
+
+
 def cmd_clear(args):
     n = clear_jobs()
     print(f"Cleared {n} job(s) from the database.")
@@ -418,6 +437,10 @@ def build_parser() -> argparse.ArgumentParser:
     p_status.add_argument("job_id", type=int)
     p_status.add_argument("new_status", choices=list(VALID_STATUSES))
 
+    # --- tailor ---
+    p_tailor = sub.add_parser("tailor", help="Generate tailored resume + cover letter for a job.")
+    p_tailor.add_argument("job_id", type=int, help="Job ID from the database")
+
     # --- clear ---
     sub.add_parser("clear", help="Delete all jobs from the database.")
 
@@ -440,6 +463,7 @@ def main():
         "stats":  cmd_stats,
         "status": cmd_status,
         "clear":  cmd_clear,
+        "tailor": cmd_tailor,
     }
     commands[args.command](args)
 
