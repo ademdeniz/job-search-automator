@@ -318,6 +318,24 @@ def cmd_export(args):
     print(f"Exported {len(jobs)} job(s) to {os.path.abspath(output_path)}")
 
 
+def cmd_apply(args):
+    from applier.greenhouse import apply_greenhouse
+    job = get_job_by_id(args.job_id)
+    if not job:
+        print(f"No job found with ID {args.job_id}.")
+        sys.exit(1)
+    result = apply_greenhouse(job)
+    if not result["ok"]:
+        print(f"Error: {result['error']}")
+        sys.exit(1)
+    print(f"\nFilled fields: {', '.join(result['filled'])}")
+    if result["missing"]:
+        print(f"Missing:       {', '.join(result['missing'])}")
+    if result["warnings"]:
+        for w in result["warnings"]:
+            print(f"Warning: {w}")
+
+
 def cmd_tailor(args):
     from tailor.resume_tailor import tailor_job
     job = get_job_by_id(args.job_id)
@@ -437,6 +455,10 @@ def build_parser() -> argparse.ArgumentParser:
     p_status.add_argument("job_id", type=int)
     p_status.add_argument("new_status", choices=list(VALID_STATUSES))
 
+    # --- apply ---
+    p_apply = sub.add_parser("apply", help="Open job application form pre-filled (review mode).")
+    p_apply.add_argument("job_id", type=int, help="Job ID to apply to")
+
     # --- tailor ---
     p_tailor = sub.add_parser("tailor", help="Generate tailored resume + cover letter for a job.")
     p_tailor.add_argument("job_id", type=int, help="Job ID from the database")
@@ -464,6 +486,7 @@ def main():
         "status": cmd_status,
         "clear":  cmd_clear,
         "tailor": cmd_tailor,
+        "apply":  cmd_apply,
     }
     commands[args.command](args)
 

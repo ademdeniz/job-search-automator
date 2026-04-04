@@ -229,6 +229,23 @@ if page == "📋 Job Board":
                     if job.get("url"):
                         st.link_button("🔗 Open Job", job["url"])
 
+                    # ── Apply button (Greenhouse only for now) ────────────────
+                    is_greenhouse = job.get("source") == "greenhouse"
+                    if is_greenhouse:
+                        if st.button(
+                            "🚀 Apply (Review Mode)",
+                            key=f"apply_{job['id']}",
+                            help="Opens the Greenhouse form pre-filled in your browser. You review and submit.",
+                        ):
+                            st.info(
+                                "Browser opening… Switch to it, review all fields, then come back here "
+                                "and press Enter in the terminal to close it."
+                            )
+                            run_cli(["main.py", "apply", str(job["id"])])
+                            update_status(job["id"], "applied")
+                            st.success("Status updated to applied. Check 📁 My Applications.")
+                            st.rerun()
+
                     new_status = st.selectbox(
                         "Update status",
                         VALID_STATUSES,
