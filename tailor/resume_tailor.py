@@ -36,9 +36,14 @@ TAILOR_SYSTEM = textwrap.dedent("""
     Your task is to produce TWO documents, returned as a single JSON object (no markdown fences):
 
     {
+      "real_company": "<the actual hiring company name — NOT a job board or aggregator>",
       "tailored_resume": "<full resume text, structured as described below>",
       "cover_letter": "<full cover letter text, plain paragraphs separated by blank lines>"
     }
+
+    For "real_company": always identify the actual employer from the job description.
+    If the company field says "RemoteHunter", "Jobgether", "Sundayy", "Scoutit", "LinkedIn", or any
+    other aggregator/job board, read the description and return the real hiring company instead.
 
     TAILORED RESUME structure (use exactly these markers):
     Line 1: Candidate full name (no pronouns)
@@ -171,8 +176,10 @@ def tailor_job(job: dict, resume_text: Optional[str] = None) -> TailorResult:
 
     tailored_resume = data.get("tailored_resume", "").strip()
     cover_letter    = data.get("cover_letter", "").strip()
+    # Use Claude's identified real company — never an aggregator name
+    real_company    = data.get("real_company", "").strip() or company
 
-    slug    = _slug(title, company)
+    slug    = _slug(title, real_company)
     out_dir = os.path.join(OUTPUT_DIR, slug)
     os.makedirs(out_dir, exist_ok=True)
 
@@ -180,8 +187,10 @@ def tailor_job(job: dict, resume_text: Optional[str] = None) -> TailorResult:
     cl_path     = os.path.join(out_dir, "cover_letter.docx")
 
     _write_resume_docx(tailored_resume, resume_path)
-    _write_cover_letter_docx(cover_letter, title, company, cl_path)
+    _write_cover_letter_docx(cover_letter, title, real_company, cl_path)
 
+    if real_company != company:
+        print(f"[Tailor] Real company identified: {real_company} (was: {company})")
     print(f"[Tailor] Saved to {out_dir}/")
     return TailorResult(
         tailored_resume=tailored_resume,
