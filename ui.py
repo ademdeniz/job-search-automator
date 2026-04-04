@@ -302,7 +302,7 @@ if page == "📋 Job Board":
                         else:
                             spinner_company = job["company"]
 
-                        with st.spinner(f"Claude is tailoring your resume for {spinner_company}… (30–60 sec)"):
+                        with st.spinner("Claude is tailoring your resume… (30–60 sec)"):
                             out = run_cli(["main.py", "tailor", str(job["id"])]
                                          + (["--company", override] if override else []))
 
