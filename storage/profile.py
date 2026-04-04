@@ -1,3 +1,5 @@
+# Copyright (c) 2025 Adem Garic. All rights reserved.
+# Unauthorized use, copying, or distribution is prohibited. See LICENSE.
 """
 User profile — name, contact info, and resume text.
 Stored in profile.json at the repo root.

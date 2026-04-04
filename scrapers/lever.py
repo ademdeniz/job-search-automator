@@ -1,3 +1,5 @@
+# Copyright (c) 2025 Adem Garic. All rights reserved.
+# Unauthorized use, copying, or distribution is prohibited. See LICENSE.
 """
 Lever ATS scraper using the public Lever postings API.
 
@@ -21,7 +23,7 @@ def _matches_qa_title(title: str) -> bool:
     """Return True if the title contains a QA/SDET term with proper word boundaries."""
     t = title.lower()
     for term in ("qa", "qe", "qc", "sdet"):
-        if re.search(r'\b' + re.escape(term) + r'\b', t):
+        if re.search(r'' + re.escape(term) + r'', t):
             return True
     for term in (
         "quality assurance", "quality engineer", "test automation",
