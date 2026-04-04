@@ -1,5 +1,10 @@
 # Job Search Automator
 
+> **© 2025 Adem Garic — All Rights Reserved.**
+> View-only. No use, copying, or distribution without written permission. See [LICENSE](LICENSE).
+
+---
+
 A personal job search tool that scrapes multiple job boards, scores every posting against your resume using Claude AI, tailors your resume and cover letter per role, and tracks your full application pipeline — all from a clean Streamlit UI or the terminal.
 
 Built with Python + Claude AI (Anthropic).
@@ -10,10 +15,13 @@ Built with Python + Claude AI (Anthropic).
 
 - **Scrape** jobs from 7 sources simultaneously: LinkedIn, Indeed, RemoteOK, WeWorkRemotely, Dice, Greenhouse, and Lever
 - **Score** every job 0–100 against your resume using Claude AI — know which roles are worth your time before you apply
-- **Tailor** your resume and cover letter per job using Claude Sonnet — generates ready-to-send `.docx` files
-- **Location modes** — Remote (US-filtered), Erie PA local/hybrid, or both in one run
+- **Tailor** your resume and cover letter per job using Claude Sonnet — fetches company context from their website, generates ready-to-send `.docx` files
+- **ATS validation** — checks generated resume for formatting issues that break ATS parsers
+- **Location modes** — US Remote, World Remote, Local/Hybrid (any city, state, or zip), or both in one run
 - **Freshness filter** — limit results to jobs posted in the last 24h, 3 days, or 7 days
-- **Track** application status: new → applied → interviewing → offer / rejected
+- **Track** your full application pipeline: applied → interviewing → offer
+- **My Applications** — dedicated tracker with inline stage advancement and permanent removal
+- **Profile page** — manage your resume, contact info, and links from the UI
 - **Visual UI** — Streamlit dashboard with color-coded job cards, score distribution charts, and one-click actions
 - **Export** to CSV for spreadsheet workflows
 
@@ -59,9 +67,13 @@ export ANTHROPIC_API_KEY=sk-ant-...
 
 To make it permanent, add the line above to your `~/.zshrc` or `~/.bashrc`.
 
-### 4. Update your resume
+### 4. Set up your profile
 
-Open `resume.txt` and replace the contents with your own resume in plain text. This is what Claude reads when scoring and tailoring.
+Launch the UI and open the **Profile** page. Enter your name, email, LinkedIn, GitHub, and paste your full resume as plain text. This is what Claude uses for scoring and tailoring — no file editing required.
+
+```bash
+./start.sh
+```
 
 ---
 
@@ -73,10 +85,13 @@ Open `resume.txt` and replace the contents with your own resume in plain text. T
 
 Opens the Streamlit dashboard at **http://localhost:8501**.
 
-Three pages:
-- **Job Board** — filterable, color-coded cards (🟢 excellent · 🟡 good · 🟠 fair · 🔴 poor), expandable details, inline status updates, tailor button
+Five pages:
+
+- **Job Board** — filterable, color-coded cards (🟢 excellent · 🟡 good · 🟠 fair · 🔴 poor), expandable details, inline status updates, tailor button with ATS check badge
 - **Dashboard** — score distribution, jobs by source, pipeline funnel, top 10 matches
 - **Actions** — scrape, fetch descriptions, score with AI, export CSV
+- **My Applications** — tracks applied/interviewing/offer jobs with one-click stage advancement; preserved across fresh searches
+- **Profile** — manage your resume and contact info
 
 ---
 
@@ -85,14 +100,17 @@ Three pages:
 ### Scrape jobs
 
 ```bash
-# Scrape all sources, remote only
-python main.py scrape --keywords "sdet appium mobile" --location "Remote"
+# US remote only (default — filters out non-US locations)
+python main.py scrape --keywords "sdet appium mobile" --location "Remote US"
+
+# Worldwide remote (no country filter)
+python main.py scrape --keywords "qa automation" --location "Remote"
+
+# Local / hybrid by city or zip
+python main.py scrape --keywords "qa engineer" --location "Erie, PA" --sources linkedin indeed
 
 # Specific sources, last 3 days only
 python main.py scrape --keywords "qa automation" --sources linkedin indeed --days-ago 3
-
-# Erie PA local/hybrid (LinkedIn + Indeed)
-python main.py scrape --keywords "qa engineer" --location "Erie, PA" --sources linkedin indeed
 
 # Limit results per source
 python main.py scrape --keywords "selenium" --max-results 25
@@ -132,8 +150,8 @@ python main.py tailor 42
 ```
 
 Generates two `.docx` files in `output/<job-slug>/`:
-- `resume.docx` — bullets reworded to mirror the job's language, professional summary tailored to the role
-- `cover_letter.docx` — specific to the role and company, with letterhead
+- `resume.docx` — bullets reworded to mirror the job's language using your exact metrics and project names; professional summary tailored to the role
+- `cover_letter.docx` — references the company by name and product/mission (fetched from their website); letterhead with your contact info
 
 > Job must have a description. If missing, paste one in the UI or run `fetch` first.
 
@@ -157,7 +175,7 @@ python main.py open 42              # open job URL in browser
 python main.py status 42 applied    # update application status
 python main.py stats                # summary by source, status, avg score
 python main.py export               # export all jobs to CSV
-python main.py clear                # delete all jobs (fresh start)
+python main.py clear                # delete new/rejected jobs (preserves applied+)
 ```
 
 Valid statuses: `new` · `applied` · `interviewing` · `offer` · `rejected`
@@ -170,18 +188,18 @@ Valid statuses: `new` · `applied` · `interviewing` · `offer` · `rejected`
 job-search-automator/
 ├── main.py               # CLI entry point — all commands
 ├── start.sh              # Launch UI: ./start.sh
-├── resume.txt            # Your resume in plain text (AI scoring + tailoring)
+├── profile.json          # Your profile — resume, contact info, links
 ├── requirements.txt
 │
 ├── scrapers/
-│   ├── base.py           # BaseScraper with days_ago / freshness helpers
+│   ├── base.py           # BaseScraper — freshness, US-location filtering
 │   ├── linkedin.py       # Playwright — US remote or geographic search
 │   ├── indeed.py         # Playwright — with date filter
 │   ├── remoteok.py       # JSON API
 │   ├── weworkremotely.py # RSS — programming jobs feed
 │   ├── dice.py           # Playwright — with date filter
-│   ├── greenhouse.py     # Public JSON API — 60+ curated QA-friendly companies
-│   └── lever.py          # Public JSON API — 60+ curated QA-friendly companies
+│   ├── greenhouse.py     # Public JSON API — curated QA-friendly companies
+│   └── lever.py          # Public JSON API — curated QA-friendly companies
 │
 ├── scorer/
 │   └── job_scorer.py     # Claude Haiku — batch scoring, 0-100 match score
@@ -193,9 +211,10 @@ job-search-automator/
 │   └── job.py            # Job dataclass
 │
 ├── storage/
-│   └── database.py       # SQLite helpers
+│   ├── database.py       # SQLite helpers
+│   └── profile.py        # Profile load/save
 │
-├── ui.py                 # Streamlit dashboard
+├── ui.py                 # Streamlit dashboard (5 pages)
 └── output/               # Generated .docx files (gitignored)
 ```
 
@@ -205,22 +224,27 @@ job-search-automator/
 
 - [x] Multi-source scraping (7 boards)
 - [x] Freshness filter (24h / 3 days / 7 days)
-- [x] Location modes (Remote US / Erie PA local / Both)
+- [x] Location modes — US Remote, World Remote, Local/Hybrid (any location)
+- [x] QA/SDET-specific title filtering (word-boundary matching)
 - [x] AI job scoring (Claude Haiku)
 - [x] Status tracking and filtering
 - [x] Streamlit visual dashboard
+- [x] My Applications tracker — pipeline with stage advancement
 - [x] Resume tailoring per job (Claude Sonnet → .docx)
-- [x] Cover letter generation (Claude Sonnet → .docx)
+- [x] Cover letter generation with company context
+- [x] ATS formatting validation
+- [x] Profile page — manage resume and contact info from UI
 - [x] CSV export
 - [ ] Auto-apply with Playwright (LinkedIn Easy Apply + Greenhouse forms)
-- [ ] LinkedIn outreach message drafter
-- [ ] Multi-user SaaS mode
+- [ ] Interview prep generator
+- [ ] Follow-up email drafter
 
 ---
 
 ## Notes
 
 - `jobs.db` and `output/` are excluded from git — they contain personal data
+- `profile.json` is excluded from git — it contains your personal resume and contact info
 - Scoring costs ~$0.001/job with Claude Haiku — 100 jobs ≈ $0.10
 - Tailoring costs ~$0.01–0.02/job with Claude Sonnet
 - LinkedIn scraping uses the unauthenticated guest search — no login required
@@ -229,6 +253,6 @@ job-search-automator/
 
 ## Author
 
-**Adem Garic** — SDET / QA Engineer  
-6+ years in test automation (Appium, Selenium, Jenkins, BrowserStack, AWS Device Farm)  
+**Adem Garic** — SDET / QA Engineer
+6+ years in test automation (Appium, Selenium, Jenkins, BrowserStack, AWS Device Farm)
 [LinkedIn](https://linkedin.com/in/adem-garic-sdet-qa) · [GitHub](https://github.com/ademdeniz)
