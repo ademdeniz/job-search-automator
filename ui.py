@@ -21,6 +21,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 from storage.database import (
     get_all_jobs, get_job_by_id, update_status, save_score,
     get_unscored_jobs, get_jobs_without_description, stats, get_applied_jobs,
+    delete_job,
 )
 
 # ── page config ──────────────────────────────────────────────────────────────
@@ -589,12 +590,19 @@ elif page == "📁 My Applications":
     st.title("📁 My Applications")
     st.caption("Your application history — preserved across fresh searches.")
 
-    PIPELINE = ["applied", "interviewing", "offer", "rejected"]
+    PIPELINE = ["applied", "interviewing", "offer"]
     PIPELINE_COLOR = {
         "applied":      "#3b82f6",
         "interviewing": "#a855f7",
         "offer":        "#22c55e",
-        "rejected":     "#ef4444",
+    }
+    NEXT_STAGE = {
+        "applied":      "interviewing",
+        "interviewing": "offer",
+    }
+    NEXT_LABEL = {
+        "applied":      "→ Interviewing",
+        "interviewing": "→ Offer",
     }
 
     # ── filters ───────────────────────────────────────────────────────────────
@@ -606,7 +614,7 @@ elif page == "📁 My Applications":
     with f3:
         app_sort = st.radio("Sort by", ["Date applied ↓", "Score ↓"], horizontal=True, key="app_sort")
 
-    # Load — only in-progress / completed applications
+    # Load — only active pipeline applications (no rejected — those are deleted)
     app_jobs = get_all_jobs(
         status=None if app_status == "All" else app_status,
         keyword=app_keyword or None,
@@ -619,11 +627,10 @@ elif page == "📁 My Applications":
     # ── pipeline summary bar ──────────────────────────────────────────────────
     db_stats = stats()
     _ap = db_stats["by_status"]
-    m1, m2, m3, m4 = st.columns(4)
+    m1, m2, m3 = st.columns(3)
     m1.metric("Applied",      _ap.get("applied", 0))
     m2.metric("Interviewing", _ap.get("interviewing", 0))
     m3.metric("Offer",        _ap.get("offer", 0))
-    m4.metric("Rejected",     _ap.get("rejected", 0))
     st.divider()
 
     if not app_jobs:
@@ -643,7 +650,7 @@ elif page == "📁 My Applications":
             st.markdown(
                 f"""
                 <div style="border-left: 4px solid {st_color}; padding: 12px 16px;
-                            background: #1e293b; border-radius: 6px; margin-bottom: 8px;">
+                            background: #1e293b; border-radius: 6px; margin-bottom: 4px;">
                     <div style="display:flex; justify-content:space-between; align-items:center;">
                         <div>
                             <span style="font-size:1.05rem; font-weight:600; color:#f1f5f9;">
@@ -672,6 +679,25 @@ elif page == "📁 My Applications":
                 unsafe_allow_html=True,
             )
 
+            # ── inline action buttons ─────────────────────────────────────────
+            btn_cols = st.columns([1, 1, 1, 4])
+            next_stage = NEXT_STAGE.get(job["status"])
+            if next_stage:
+                if btn_cols[0].button(
+                    NEXT_LABEL[job["status"]],
+                    key=f"advance_{job['id']}",
+                    use_container_width=True,
+                ):
+                    update_status(job["id"], next_stage)
+                    st.rerun()
+            if btn_cols[1].button(
+                "🗑 Remove",
+                key=f"delete_{job['id']}",
+                use_container_width=True,
+            ):
+                delete_job(job["id"])
+                st.rerun()
+
             with st.expander(f"Details — ID {job['id']}", expanded=False):
                 d1, d2 = st.columns([2, 1])
                 with d1:
@@ -685,20 +711,6 @@ elif page == "📁 My Applications":
                     st.markdown(f"**Remote:** {'Yes' if job.get('remote') else 'No'}")
                     if job.get("url"):
                         st.link_button("🔗 Open Job", job["url"])
-
-                    st.divider()
-                    # Stage updater
-                    new_status = st.selectbox(
-                        "Update stage",
-                        PIPELINE,
-                        index=PIPELINE.index(job["status"]) if job["status"] in PIPELINE else 0,
-                        key=f"appstatus_{job['id']}",
-                    )
-                    if new_status != job["status"]:
-                        if st.button("Save", key=f"appsave_{job['id']}"):
-                            update_status(job["id"], new_status)
-                            st.success(f"Stage updated to **{new_status}**")
-                            st.rerun()
 
                     # Notes field stored in session state (lightweight, no DB change needed)
                     notes_key = f"notes_{job['id']}"

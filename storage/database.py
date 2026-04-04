@@ -144,6 +144,14 @@ def get_unscored_jobs() -> List[dict]:
     return [dict(r) for r in rows]
 
 
+def delete_job(job_id: int):
+    """Permanently delete a single job by ID."""
+    conn = get_connection()
+    conn.execute("DELETE FROM jobs WHERE id=?", (job_id,))
+    conn.commit()
+    conn.close()
+
+
 def clear_jobs() -> int:
     """Delete only new/rejected jobs — preserves applied, interviewing, and offer records.
     Returns count of deleted rows."""
