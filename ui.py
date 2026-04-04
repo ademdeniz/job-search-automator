@@ -472,7 +472,6 @@ elif page == "🔧 Actions":
     # ── scrape ────────────────────────────────────────────────────────────────
     with st.expander("🕷️ Scrape Jobs", expanded=True):
         st.markdown("Search job boards and pull new listings into the database.")
-        st.caption("ℹ️ Greenhouse and Lever use a curated list of QA/SDET-friendly companies. For other fields, use LinkedIn, Indeed, RemoteOK, and Dice.")
 
         s_col1, s_col2 = st.columns(2)
         with s_col1:
