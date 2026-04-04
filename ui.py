@@ -712,6 +712,19 @@ elif page == "📁 My Applications":
                     if job.get("url"):
                         st.link_button("🔗 Open Job", job["url"])
 
+                    st.divider()
+                    # Stage corrector — lets you fix mistakes / go back
+                    correct_stage = st.selectbox(
+                        "Correct stage",
+                        PIPELINE,
+                        index=PIPELINE.index(job["status"]) if job["status"] in PIPELINE else 0,
+                        key=f"correct_{job['id']}",
+                    )
+                    if correct_stage != job["status"]:
+                        if st.button("Save", key=f"correctsave_{job['id']}"):
+                            update_status(job["id"], correct_stage)
+                            st.rerun()
+
                     # Notes field stored in session state (lightweight, no DB change needed)
                     notes_key = f"notes_{job['id']}"
                     st.text_area(
