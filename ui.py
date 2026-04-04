@@ -101,7 +101,7 @@ with st.sidebar:
 
     page = st.radio(
         "Navigate",
-        ["📋 Job Board", "📊 Dashboard", "🔧 Actions"],
+        ["📋 Job Board", "📊 Dashboard", "🔧 Actions", "📁 My Applications"],
         label_visibility="collapsed",
     )
 
@@ -544,3 +544,131 @@ elif page == "🔧 Actions":
                 )
             else:
                 st.warning("No jobs to export.")
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# PAGE: MY APPLICATIONS
+# ════════════════════════════════════════════════════════════════════════════
+elif page == "📁 My Applications":
+    st.title("📁 My Applications")
+    st.caption("Your application history — preserved across fresh searches.")
+
+    PIPELINE = ["applied", "interviewing", "offer", "rejected"]
+    PIPELINE_COLOR = {
+        "applied":      "#3b82f6",
+        "interviewing": "#a855f7",
+        "offer":        "#22c55e",
+        "rejected":     "#ef4444",
+    }
+
+    # ── filters ───────────────────────────────────────────────────────────────
+    f1, f2, f3 = st.columns([2, 1.5, 1.5])
+    with f1:
+        app_keyword = st.text_input("🔍 Search", placeholder="title, company…", key="app_kw")
+    with f2:
+        app_status = st.selectbox("Stage", ["All"] + PIPELINE, key="app_status")
+    with f3:
+        app_sort = st.radio("Sort by", ["Date applied ↓", "Score ↓"], horizontal=True, key="app_sort")
+
+    # Load — only in-progress / completed applications
+    app_jobs = get_all_jobs(
+        status=None if app_status == "All" else app_status,
+        keyword=app_keyword or None,
+    )
+    app_jobs = [j for j in app_jobs if j["status"] in PIPELINE]
+
+    if app_sort == "Score ↓":
+        app_jobs.sort(key=lambda j: (j.get("score") or -1), reverse=True)
+
+    # ── pipeline summary bar ──────────────────────────────────────────────────
+    db_stats = stats()
+    _ap = db_stats["by_status"]
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("Applied",      _ap.get("applied", 0))
+    m2.metric("Interviewing", _ap.get("interviewing", 0))
+    m3.metric("Offer",        _ap.get("offer", 0))
+    m4.metric("Rejected",     _ap.get("rejected", 0))
+    st.divider()
+
+    if not app_jobs:
+        st.info("No applications yet. Mark jobs as 'applied' from the Job Board to track them here.")
+        st.stop()
+
+    st.caption(f"{len(app_jobs)} application(s)")
+
+    # ── application cards ─────────────────────────────────────────────────────
+    for job in app_jobs:
+        score      = job.get("score")
+        level      = match_level(score)
+        s_color    = SCORE_COLOR.get(level, "#94a3b8")
+        st_color   = PIPELINE_COLOR.get(job["status"], "#94a3b8")
+
+        with st.container():
+            st.markdown(
+                f"""
+                <div style="border-left: 4px solid {st_color}; padding: 12px 16px;
+                            background: #1e293b; border-radius: 6px; margin-bottom: 8px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <div>
+                            <span style="font-size:1.05rem; font-weight:600; color:#f1f5f9;">
+                                {job['title']}
+                            </span>
+                            &nbsp;
+                            <span style="color:#94a3b8; font-size:0.9rem;">
+                                {job['company']} · {job['location']}
+                            </span>
+                        </div>
+                        <div style="display:flex; gap:8px; align-items:center;">
+                            <span style="background:{s_color}22; color:{s_color};
+                                         padding:2px 10px; border-radius:99px; font-size:0.8rem;">
+                                {score_badge(score)}
+                            </span>
+                            <span style="background:{st_color}22; color:{st_color};
+                                         padding:2px 10px; border-radius:99px; font-size:0.8rem;
+                                         font-weight:600;">
+                                {job['status']}
+                            </span>
+                            <span style="color:#64748b; font-size:0.8rem;">{job['source']}</span>
+                        </div>
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+            with st.expander(f"Details — ID {job['id']}", expanded=False):
+                d1, d2 = st.columns([2, 1])
+                with d1:
+                    if job.get("score_reason"):
+                        st.markdown(f"**AI Analysis:** {job['score_reason']}")
+                    desc = job.get("description") or "No description saved."
+                    st.markdown(f"**Description:**\n\n{desc[:1000]}{'…' if len(desc) > 1000 else ''}")
+                with d2:
+                    st.markdown(f"**Salary:** {job.get('salary') or 'N/A'}")
+                    st.markdown(f"**Posted:** {job.get('posted_date') or 'N/A'}")
+                    st.markdown(f"**Remote:** {'Yes' if job.get('remote') else 'No'}")
+                    if job.get("url"):
+                        st.link_button("🔗 Open Job", job["url"])
+
+                    st.divider()
+                    # Stage updater
+                    new_status = st.selectbox(
+                        "Update stage",
+                        PIPELINE,
+                        index=PIPELINE.index(job["status"]) if job["status"] in PIPELINE else 0,
+                        key=f"appstatus_{job['id']}",
+                    )
+                    if new_status != job["status"]:
+                        if st.button("Save", key=f"appsave_{job['id']}"):
+                            update_status(job["id"], new_status)
+                            st.success(f"Stage updated to **{new_status}**")
+                            st.rerun()
+
+                    # Notes field stored in session state (lightweight, no DB change needed)
+                    notes_key = f"notes_{job['id']}"
+                    st.text_area(
+                        "Notes (interview prep, contacts, follow-up dates…)",
+                        key=notes_key,
+                        height=100,
+                        placeholder="e.g. Phone screen with Sarah on Apr 10, asked about Appium experience…",
+                    )
