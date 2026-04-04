@@ -6,6 +6,13 @@ from datetime import datetime, timezone, timedelta
 from typing import List, Optional
 from models.job import Job
 
+# Words too generic to use alone as a title filter — e.g. "engineer" matches everything.
+_GENERIC_WORDS = {
+    "engineer", "developer", "manager", "analyst", "specialist",
+    "lead", "senior", "junior", "mid", "staff", "principal",
+    "associate", "director", "head", "officer", "coordinator",
+}
+
 # Non-US place names — if any appear in a job's location we exclude it in US-only mode.
 _NON_US_PLACES = {
     "ireland", "uk", "united kingdom", "germany", "france", "netherlands",
@@ -51,6 +58,27 @@ class BaseScraper(ABC):
             return True
         # Ambiguous (could be a US city with no country) → include
         return True
+
+    def _title_matches_keywords(self, title: str) -> bool:
+        """
+        Return True if the job title contains at least one meaningful user keyword.
+        Uses word-boundary matching for short terms (≤4 chars) to avoid false positives
+        like 'qa' matching inside 'icqa'. Generic words like 'engineer' are skipped
+        unless they're the only keyword supplied.
+        """
+        t = title.lower()
+        meaningful = [kw for kw in self.keywords if kw.lower() not in _GENERIC_WORDS]
+        # If all keywords are generic, fall back to using all of them
+        candidates = meaningful or self.keywords
+        for kw in candidates:
+            kw_l = kw.lower()
+            if len(kw_l) <= 4:
+                if _re.search(r'\b' + _re.escape(kw_l) + r'\b', t):
+                    return True
+            else:
+                if kw_l in t:
+                    return True
+        return False
 
     @abstractmethod
     def scrape(self) -> List[Job]:

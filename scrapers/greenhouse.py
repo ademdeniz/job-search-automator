@@ -6,8 +6,8 @@ Greenhouse ATS scraper using the public Greenhouse boards API.
 Many tech companies post jobs via Greenhouse and expose a public JSON API
 at boards-api.greenhouse.io — no authentication required.
 
-We maintain a curated list of companies known to hire QA/SDET engineers
-and query each one's board, filtering results by keyword.
+We maintain a curated list of tech companies and filter job titles against
+the user's own search keywords, so this works for any role or field.
 """
 
 import re
@@ -17,41 +17,10 @@ from typing import List
 from models.job import Job
 from .base import BaseScraper
 
-
-def _matches_qa_title(title: str) -> bool:
-    """Return True if the title contains a QA/SDET term with proper word boundaries."""
-    t = title.lower()
-    # Short abbreviations need word boundaries to avoid e.g. "icqa" matching "qa"
-    for term in ("qa", "qe", "qc", "sdet"):
-        if re.search(r'' + re.escape(term) + r'', t):
-            return True
-    # Longer phrases — substring match is safe
-    for term in (
-        "quality assurance", "quality engineer", "test automation",
-        "automation engineer", "automation tester", "test engineer",
-        "software tester", "quality analyst", "testing engineer",
-        "manual tester", "software quality", "quality control",
-        "qc engineer", "test lead", "qa lead",
-    ):
-        if term in t:
-            return True
-    return False
-
 API_BASE = "https://boards-api.greenhouse.io/v1/boards/{company}/jobs"
 
-# Terms that must appear in the job title for it to be considered a QA/SDET role.
-# Deliberately narrow — "engineer" alone is too broad and matches hundreds of unrelated roles.
-QA_TITLE_TERMS = {
-    "qa", "qe", "sdet", "quality assurance", "quality engineer",
-    "test automation", "automation engineer", "automation tester",
-    "test engineer", "software tester", "quality analyst",
-    "testing engineer", "manual tester", "software quality",
-    "quality control", "qc engineer", "test lead", "qa lead",
-}
-
-# Curated list of tech companies that use Greenhouse and commonly hire QA/SDET.
-# Add more company slugs here as needed.
-QA_FRIENDLY_COMPANIES = [
+# Curated list of tech companies that use Greenhouse.
+COMPANIES = [
     "anthropic", "stripe", "shopify", "airbnb", "dropbox", "zendesk",
     "datadog", "pagerduty", "twilio", "figma", "notion", "linear",
     "vercel", "supabase", "retool", "brex", "ramp", "scale",
@@ -68,7 +37,7 @@ QA_FRIENDLY_COMPANIES = [
     "sendgrid", "mailchimp", "klaviyo", "iterable",
     "intercom", "freshworks", "helpscout", "front",
     "greenhouse", "lever", "workday", "bamboohr",
-    "navan", "expensify", "brex", "mercury",
+    "navan", "expensify",
     "faire", "shipbob", "flexport", "project44",
     "duolingo", "coursera", "instructure", "kahoot",
     "calm", "headspace", "hims", "ro", "tempus",
@@ -77,13 +46,12 @@ QA_FRIENDLY_COMPANIES = [
 
 
 class GreenhouseScraper(BaseScraper):
-    """Scrapes Greenhouse ATS boards for QA/SDET roles."""
+    """Scrapes Greenhouse ATS boards, filtering by user keywords."""
 
     def scrape(self) -> List[Job]:
-        query_terms = [kw.lower() for kw in self.keywords]
         jobs: List[Job] = []
 
-        for company in QA_FRIENDLY_COMPANIES:
+        for company in COMPANIES:
             if len(jobs) >= self.max_results:
                 break
             try:
@@ -105,8 +73,8 @@ class GreenhouseScraper(BaseScraper):
 
                 title = post.get("title", "")
 
-                # Filter on title — must match a QA-specific term with word boundaries.
-                if not _matches_qa_title(title):
+                # Filter on title using the user's own keywords (field-agnostic).
+                if not self._title_matches_keywords(title):
                     continue
 
                 # Date filter
@@ -114,7 +82,6 @@ class GreenhouseScraper(BaseScraper):
                     continue
 
                 content = post.get("content", "") or ""
-                # Unescape HTML entities then strip tags
                 import html as html_module
                 content = html_module.unescape(content)
                 description = re.sub(r"<[^>]+>", " ", content).strip()
@@ -139,7 +106,7 @@ class GreenhouseScraper(BaseScraper):
                     location=location or "Unknown",
                     source="greenhouse",
                     url=post.get("absolute_url", ""),
-                    description=description[:3000],  # cap to avoid huge payloads
+                    description=description[:3000],
                     remote=remote,
                     posted_date=post.get("updated_at", ""),
                 ))
