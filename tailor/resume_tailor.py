@@ -1,3 +1,5 @@
+# Copyright (c) 2025 Adem Garic. All rights reserved.
+# Unauthorized use, copying, or distribution is prohibited. See LICENSE.
 """
 Resume Tailor + Cover Letter Generator using Claude API.
 

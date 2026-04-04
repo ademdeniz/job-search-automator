@@ -1,3 +1,5 @@
+# Copyright (c) 2025 Adem Garic. All rights reserved.
+# Unauthorized use, copying, or distribution is prohibited. See LICENSE.
 import re as _re
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone, timedelta
@@ -45,7 +47,7 @@ class BaseScraper(ABC):
         if "united states" in loc or "usa" in loc:
             return True
         # Word-boundary " us" check (e.g. "Remote, US")
-        if _re.search(r'\bus\b', loc):
+        if _re.search(r'us', loc):
             return True
         # Ambiguous (could be a US city with no country) → include
         return True
