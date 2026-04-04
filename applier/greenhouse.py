@@ -56,16 +56,29 @@ def _scroll_and_fill(page, selector: str, value: str):
             time.sleep(0.3)
             tag = el.evaluate("e => e.tagName.toLowerCase()")
             if tag == "select":
-                # Try exact label match first, then partial
+                # 1. Try exact label match
                 try:
                     el.select_option(label=value)
                     return True
                 except Exception:
-                    # Try selecting by value text contains
-                    options = el.query_selector_all("option")
+                    pass
+                # 2. Try partial text match on options
+                options = el.query_selector_all("option")
+                for opt in options:
+                    opt_text = (opt.inner_text() or "").strip()
+                    if not opt_text or opt_text.lower() in ("select...", "select", ""):
+                        continue
+                    if value.lower() in opt_text.lower():
+                        opt_val = opt.get_attribute("value")
+                        el.select_option(value=opt_val)
+                        return True
+                # 3. For Yes/consent answers — pick first option containing
+                #    "yes", "i acknowledge", "i have read", "i agree"
+                if value.lower() in ("yes", "i acknowledge"):
+                    CONSENT_PHRASES = ("yes", "i acknowledge", "i have read", "i agree", "i certify")
                     for opt in options:
-                        opt_text = (opt.inner_text() or "").strip()
-                        if value.lower() in opt_text.lower():
+                        opt_text = (opt.inner_text() or "").strip().lower()
+                        if any(p in opt_text for p in CONSENT_PHRASES):
                             opt_val = opt.get_attribute("value")
                             el.select_option(value=opt_val)
                             return True
@@ -216,10 +229,15 @@ def apply_greenhouse(job: dict, headless: bool = False) -> dict:
             # State list question (Alabama, Alaska, etc.)
             ("alabama.*alaska.*delaware",           CANDIDATE["in_listed_states"]),
             ("following states",                    CANDIDATE["in_listed_states"]),
-            # Privacy / consent
+            # Privacy / consent — match any acknowledgement or double-check dropdown
             ("privacy notice",                      CANDIDATE["privacy_consent"]),
             ("job applicant privacy",               CANDIDATE["privacy_consent"]),
             ("acknowledge.*privacy",                CANDIDATE["privacy_consent"]),
+            ("read and understand",                 CANDIDATE["privacy_consent"]),
+            ("double.check",                        CANDIDATE["privacy_consent"]),
+            ("double check",                        CANDIDATE["privacy_consent"]),
+            ("information provided above",          CANDIDATE["privacy_consent"]),
+            ("accuracy is crucial",                 CANDIDATE["privacy_consent"]),
         ]
 
         try:
@@ -250,8 +268,11 @@ def apply_greenhouse(job: dict, headless: bool = False) -> dict:
         if missing:
             print(f"  Missing: {', '.join(missing)}")
         print()
-        print("  Review all fields, answer any remaining questions,")
-        print("  then click Submit when ready.")
+        print("  Still needs YOU:")
+        print("  • Demographic questions (gender, race, etc.) — your choice")
+        print("  • Any custom open-text questions")
+        print("  • Final review of all fields")
+        print("  • Click Submit when ready")
         print()
         print("  Press ENTER here to close the browser when done.")
         print("═" * 60 + "\n")
