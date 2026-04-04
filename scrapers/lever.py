@@ -8,13 +8,31 @@ We maintain a curated list of companies known to hire QA/SDET engineers
 and query each one, filtering results by keyword.
 """
 
+import re
 import requests
 from datetime import datetime, timezone
 from typing import List
-import re
 
 from models.job import Job
 from .base import BaseScraper
+
+
+def _matches_qa_title(title: str) -> bool:
+    """Return True if the title contains a QA/SDET term with proper word boundaries."""
+    t = title.lower()
+    for term in ("qa", "qe", "qc", "sdet"):
+        if re.search(r'\b' + re.escape(term) + r'\b', t):
+            return True
+    for term in (
+        "quality assurance", "quality engineer", "test automation",
+        "automation engineer", "automation tester", "test engineer",
+        "software tester", "quality analyst", "testing engineer",
+        "manual tester", "software quality", "quality control",
+        "qc engineer", "test lead", "qa lead",
+    ):
+        if term in t:
+            return True
+    return False
 
 API_BASE = "https://api.lever.co/v0/postings/{company}"
 
@@ -112,12 +130,15 @@ class LeverScraper(BaseScraper):
                     except (TypeError, ValueError):
                         pass
 
-                # Title must match a QA-specific term — user keywords like "engineer" are too broad
-                if not any(t in title.lower() for t in QA_TITLE_TERMS):
+                # Title must match a QA-specific term with word boundaries
+                if not _matches_qa_title(title):
                     continue
 
                 # Location filter
-                if self.location and self.location.lower() not in ("remote", "anywhere", ""):
+                if self.us_remote_only:
+                    if not self._is_us_compatible(location):
+                        continue
+                elif self.location and self.location.lower() not in ("remote", "anywhere", ""):
                     if self.location.lower() not in location.lower():
                         continue
 

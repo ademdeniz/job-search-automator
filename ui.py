@@ -451,12 +451,13 @@ elif page == "🔧 Actions":
             )
             location_mode = st.radio(
                 "Location mode",
-                ["🌐 Remote only", "📍 Erie PA (local / hybrid)", "🔀 Both"],
+                ["🇺🇸 US Remote only", "🌐 World Remote", "📍 Erie PA (local / hybrid)", "🔀 Both (US Remote + Erie)"],
                 index=0,
                 help=(
-                    "Remote: searches all selected sources for remote jobs.\n"
-                    "Erie PA: searches LinkedIn + Indeed for on-site / hybrid roles near Erie, PA.\n"
-                    "Both: does both passes in sequence."
+                    "US Remote: remote jobs limited to United States.\n"
+                    "World Remote: remote jobs worldwide (no country filter).\n"
+                    "Erie PA: LinkedIn + Indeed for on-site / hybrid roles near Erie, PA.\n"
+                    "Both: US Remote + Erie PA in sequence."
                 ),
             )
         with s_col2:
@@ -500,20 +501,22 @@ elif page == "🔧 Actions":
                 days_args = ["--days-ago", str(days_ago)] if days_ago else []
 
                 # ── remote pass ───────────────────────────────────────────
-                if location_mode in ("🌐 Remote only", "🔀 Both"):
-                    with st.spinner("Scraping remote jobs…"):
+                if location_mode in ("🇺🇸 US Remote only", "🌐 World Remote", "🔀 Both (US Remote + Erie)"):
+                    remote_location = "Remote US" if location_mode in ("🇺🇸 US Remote only", "🔀 Both (US Remote + Erie)") else "Remote"
+                    label = "US remote" if remote_location == "Remote US" else "worldwide remote"
+                    with st.spinner(f"Scraping {label} jobs…"):
                         out = run_cli(
                             ["main.py", "scrape"]
                             + kw_args
-                            + ["--location", "Remote"]
+                            + ["--location", remote_location]
                             + src_args_remote
                             + max_args
                             + days_args
                         )
-                    output_lines.append("── Remote pass ──\n" + out)
+                    output_lines.append(f"── Remote pass ({label}) ──\n" + out)
 
                 # ── Erie PA pass ──────────────────────────────────────────
-                if location_mode in ("📍 Erie PA (local / hybrid)", "🔀 Both"):
+                if location_mode in ("📍 Erie PA (local / hybrid)", "🔀 Both (US Remote + Erie)"):
                     erie_sources = [s for s in ERIE_SOURCES if s in sources_input]
                     if erie_sources:
                         with st.spinner("Scraping Erie PA local / hybrid jobs (LinkedIn + Indeed)…"):

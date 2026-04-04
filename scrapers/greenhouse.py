@@ -8,12 +8,32 @@ We maintain a curated list of companies known to hire QA/SDET engineers
 and query each one's board, filtering results by keyword.
 """
 
+import re
 import requests
 from typing import List
-import re
 
 from models.job import Job
 from .base import BaseScraper
+
+
+def _matches_qa_title(title: str) -> bool:
+    """Return True if the title contains a QA/SDET term with proper word boundaries."""
+    t = title.lower()
+    # Short abbreviations need word boundaries to avoid e.g. "icqa" matching "qa"
+    for term in ("qa", "qe", "qc", "sdet"):
+        if re.search(r'\b' + re.escape(term) + r'\b', t):
+            return True
+    # Longer phrases — substring match is safe
+    for term in (
+        "quality assurance", "quality engineer", "test automation",
+        "automation engineer", "automation tester", "test engineer",
+        "software tester", "quality analyst", "testing engineer",
+        "manual tester", "software quality", "quality control",
+        "qc engineer", "test lead", "qa lead",
+    ):
+        if term in t:
+            return True
+    return False
 
 API_BASE = "https://boards-api.greenhouse.io/v1/boards/{company}/jobs"
 
@@ -83,10 +103,8 @@ class GreenhouseScraper(BaseScraper):
 
                 title = post.get("title", "")
 
-                # Filter on title — must match a QA-specific term, not just any keyword.
-                # Using user keywords alone is too broad ("engineer" matches everything).
-                title_lower = title.lower()
-                if not any(t in title_lower for t in QA_TITLE_TERMS):
+                # Filter on title — must match a QA-specific term with word boundaries.
+                if not _matches_qa_title(title):
                     continue
 
                 # Date filter
@@ -104,7 +122,10 @@ class GreenhouseScraper(BaseScraper):
                 location = location_data.get("name", "") if location_data else ""
 
                 # Location filter
-                if self.location and self.location.lower() not in ("remote", "anywhere", ""):
+                if self.us_remote_only:
+                    if not self._is_us_compatible(location):
+                        continue
+                elif self.location and self.location.lower() not in ("remote", "anywhere", ""):
                     if self.location.lower() not in location.lower():
                         continue
 
