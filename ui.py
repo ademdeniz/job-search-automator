@@ -135,7 +135,7 @@ if page == "📋 Job Board":
     with col1:
         keyword = st.text_input("🔍 Search", placeholder="title, company, description…")
     with col2:
-        filter_status = st.selectbox("Status", ["All"] + VALID_STATUSES)
+        filter_status = st.selectbox("Status", ["New only", "All"] + VALID_STATUSES)
     with col3:
         filter_source = st.selectbox("Source", ["All"] + SOURCES)
     with col4:
@@ -146,8 +146,16 @@ if page == "📋 Job Board":
     sort_by = st.radio("Sort by", ["Score ↓", "Date ↓"], horizontal=True)
 
     # ── load data ─────────────────────────────────────────────────────────────
+    # "New only" = default view — hides applied/interviewing/offer (those live in My Applications)
+    if filter_status == "New only":
+        status_filter = "new"
+    elif filter_status == "All":
+        status_filter = None
+    else:
+        status_filter = filter_status
+
     jobs = get_all_jobs(
-        status=None if filter_status == "All" else filter_status,
+        status=status_filter,
         source=None if filter_source == "All" else filter_source,
         keyword=keyword or None,
         remote=True if remote_only else None,
@@ -159,10 +167,10 @@ if page == "📋 Job Board":
     if sort_by == "Score ↓":
         jobs.sort(key=lambda j: (j.get("score") or -1), reverse=True)
 
-    st.caption(f"{len(jobs)} job(s) found")
+    st.caption(f"{len(jobs)} job(s) found — applied jobs are in 📁 My Applications")
 
     if not jobs:
-        st.info("No jobs match your filters. Try scraping more jobs from the Actions tab.")
+        st.info("No new jobs found. Scrape more from the Actions tab — your applied jobs are safe in 📁 My Applications.")
         st.stop()
 
     # ── job cards ─────────────────────────────────────────────────────────────
