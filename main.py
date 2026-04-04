@@ -327,6 +327,10 @@ def cmd_tailor(args):
     if not job.get("description"):
         print(f"Job {args.job_id} has no description. Run 'fetch' first.")
         sys.exit(1)
+    # Allow overriding the company name (useful for aggregator-sourced jobs)
+    if args.company:
+        job = dict(job)
+        job["company"] = args.company
     try:
         result = tailor_job(job)
         print(f"\nDone!")
@@ -440,6 +444,8 @@ def build_parser() -> argparse.ArgumentParser:
     # --- tailor ---
     p_tailor = sub.add_parser("tailor", help="Generate tailored resume + cover letter for a job.")
     p_tailor.add_argument("job_id", type=int, help="Job ID from the database")
+    p_tailor.add_argument("--company", default=None,
+                          help="Override the company name (useful for aggregator-listed jobs)")
 
     # --- clear ---
     sub.add_parser("clear", help="Delete new/rejected jobs (preserves applied, interviewing, offer).")

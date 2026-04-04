@@ -247,6 +247,22 @@ if page == "📋 Job Board":
                     has_desc = bool(job.get("description"))
                     manual_key = f"manual_desc_{job['id']}"
 
+                    # Detect aggregators — show company override field
+                    AGGREGATORS = {
+                        "remotehunter", "jobgether", "indeed", "linkedin",
+                        "glassdoor", "ziprecruiter", "simplyhired", "scoutit",
+                    }
+                    is_aggregator = job.get("company", "").lower().strip() in AGGREGATORS
+                    company_override_key = f"company_override_{job['id']}"
+
+                    if is_aggregator:
+                        st.warning(f"⚠️ Listed via **{job['company']}** — enter the real company name below.")
+                        st.text_input(
+                            "Real company name",
+                            key=company_override_key,
+                            placeholder="e.g. Veracyte",
+                        )
+
                     if not has_desc:
                         st.caption("No description — paste one below to enable tailoring.")
                         manual_desc = st.text_area(
@@ -255,7 +271,6 @@ if page == "📋 Job Board":
                             height=160,
                             placeholder="Copy the full job description from the job board and paste it here…",
                         )
-                        # Save it to DB so future actions use it too
                         if manual_desc and st.button("💾 Save description", key=f"save_desc_{job['id']}"):
                             from storage.database import update_description
                             update_description(job["id"], manual_desc)
@@ -273,13 +288,23 @@ if page == "📋 Job Board":
                         disabled=not can_tailor,
                         type="primary",
                     ):
-                        # If description came from the text area, save it to DB first
+                        # Save description to DB if it came from the text area
                         if not has_desc and tailor_desc:
                             from storage.database import update_description
                             update_description(job["id"], tailor_desc)
 
-                        with st.spinner(f"Claude is tailoring your resume for {job['company']}… (30–60 sec)"):
-                            out = run_cli(["main.py", "tailor", str(job["id"])])
+                        # If user provided a real company name, temporarily patch the job
+                        # by prepending it to the description so Claude sees it
+                        override = st.session_state.get(company_override_key, "").strip()
+                        if override:
+                            run_cli(["main.py", "tailor", str(job["id"]), "--company", override])
+                            spinner_company = override
+                        else:
+                            spinner_company = job["company"]
+
+                        with st.spinner(f"Claude is tailoring your resume for {spinner_company}… (30–60 sec)"):
+                            out = run_cli(["main.py", "tailor", str(job["id"])]
+                                         + (["--company", override] if override else []))
 
                         # Parse file paths and store in session state so they
                         # survive rerenders (clicking one download won't lose the other)

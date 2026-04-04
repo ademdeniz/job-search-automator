@@ -97,6 +97,19 @@ def _load_resume() -> str:
         return f.read().strip()
 
 
+# Job aggregators — when the stored company is one of these,
+# Claude must extract the real employer from the description instead.
+AGGREGATORS = {
+    "remotehunter", "jobgether", "indeed", "linkedin", "glassdoor",
+    "ziprecruiter", "simplyhired", "careerbuilder", "monster", "dice",
+    "jobboard", "jobsite", "scoutit", "talent.com", "jobs",
+}
+
+
+def _is_aggregator(company: str) -> bool:
+    return company.lower().strip() in AGGREGATORS
+
+
 def _slug(title: str, company: str) -> str:
     raw = f"{title}_{company}"
     return re.sub(r"[^a-z0-9]+", "_", raw.lower()).strip("_")[:60]
@@ -113,6 +126,15 @@ def tailor_job(job: dict, resume_text: Optional[str] = None) -> TailorResult:
     if not description.strip():
         raise ValueError(f"Job {job.get('id')} has no description — cannot tailor. Fetch the description first.")
 
+    # If job was scraped via an aggregator, tell Claude to find the real company
+    if _is_aggregator(company):
+        company_line = (
+            f"Listed via: {company} (aggregator — identify the REAL hiring company "
+            f"from the job description and use that company name throughout all output)"
+        )
+    else:
+        company_line = f"Company: {company}"
+
     client = anthropic.Anthropic()
 
     user_msg = textwrap.dedent(f"""
@@ -121,7 +143,7 @@ def tailor_job(job: dict, resume_text: Optional[str] = None) -> TailorResult:
 
         ## Job Posting
         Title:   {title}
-        Company: {company}
+        {company_line}
 
         {description[:4000]}
     """).strip()
