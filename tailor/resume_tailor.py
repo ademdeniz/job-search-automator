@@ -36,9 +36,14 @@ TAILOR_SYSTEM = textwrap.dedent("""
     Your task is to produce TWO documents, returned as a single JSON object (no markdown fences):
 
     {
+      "real_company": "<the actual hiring company name — NOT a job board or aggregator>",
       "tailored_resume": "<full resume text, structured as described below>",
       "cover_letter": "<full cover letter text, plain paragraphs separated by blank lines>"
     }
+
+    For "real_company": always identify the actual employer from the job description.
+    If the company field says "RemoteHunter", "Jobgether", "Sundayy", "Scoutit", "LinkedIn", or any
+    other aggregator/job board, read the description and return the real hiring company instead.
 
     TAILORED RESUME structure (use exactly these markers):
     Line 1: Candidate full name (no pronouns)
@@ -97,6 +102,19 @@ def _load_resume() -> str:
         return f.read().strip()
 
 
+# Job aggregators — when the stored company is one of these,
+# Claude must extract the real employer from the description instead.
+AGGREGATORS = {
+    "remotehunter", "jobgether", "indeed", "linkedin", "glassdoor",
+    "ziprecruiter", "simplyhired", "careerbuilder", "monster", "dice",
+    "jobboard", "jobsite", "scoutit", "talent.com", "jobs",
+}
+
+
+def _is_aggregator(company: str) -> bool:
+    return company.lower().strip() in AGGREGATORS
+
+
 def _slug(title: str, company: str) -> str:
     raw = f"{title}_{company}"
     return re.sub(r"[^a-z0-9]+", "_", raw.lower()).strip("_")[:60]
@@ -113,6 +131,15 @@ def tailor_job(job: dict, resume_text: Optional[str] = None) -> TailorResult:
     if not description.strip():
         raise ValueError(f"Job {job.get('id')} has no description — cannot tailor. Fetch the description first.")
 
+    # If job was scraped via an aggregator, tell Claude to find the real company
+    if _is_aggregator(company):
+        company_line = (
+            f"Listed via: {company} (aggregator — identify the REAL hiring company "
+            f"from the job description and use that company name throughout all output)"
+        )
+    else:
+        company_line = f"Company: {company}"
+
     client = anthropic.Anthropic()
 
     user_msg = textwrap.dedent(f"""
@@ -121,7 +148,7 @@ def tailor_job(job: dict, resume_text: Optional[str] = None) -> TailorResult:
 
         ## Job Posting
         Title:   {title}
-        Company: {company}
+        {company_line}
 
         {description[:4000]}
     """).strip()
@@ -149,8 +176,10 @@ def tailor_job(job: dict, resume_text: Optional[str] = None) -> TailorResult:
 
     tailored_resume = data.get("tailored_resume", "").strip()
     cover_letter    = data.get("cover_letter", "").strip()
+    # Use Claude's identified real company — never an aggregator name
+    real_company    = data.get("real_company", "").strip() or company
 
-    slug    = _slug(title, company)
+    slug    = _slug(title, real_company)
     out_dir = os.path.join(OUTPUT_DIR, slug)
     os.makedirs(out_dir, exist_ok=True)
 
@@ -158,8 +187,10 @@ def tailor_job(job: dict, resume_text: Optional[str] = None) -> TailorResult:
     cl_path     = os.path.join(out_dir, "cover_letter.docx")
 
     _write_resume_docx(tailored_resume, resume_path)
-    _write_cover_letter_docx(cover_letter, title, company, cl_path)
+    _write_cover_letter_docx(cover_letter, title, real_company, cl_path)
 
+    if real_company != company:
+        print(f"[Tailor] Real company identified: {real_company} (was: {company})")
     print(f"[Tailor] Saved to {out_dir}/")
     return TailorResult(
         tailored_resume=tailored_resume,
