@@ -832,5 +832,4 @@ elif page == "👤 Profile":
             "target_role": p_target_role.strip(),
             "resume":      p_resume.strip(),
         })
-        st.success("Profile saved. All future tailoring will use this info.")
-        st.rerun()
+        st.toast("Profile saved!", icon="✅")
