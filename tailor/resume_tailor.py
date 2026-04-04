@@ -24,12 +24,11 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml.ns import qn
 from docx.oxml import OxmlElement
 
-RESUME_PATH = os.path.join(os.path.dirname(__file__), "..", "resume.txt")
-OUTPUT_DIR  = os.path.join(os.path.dirname(__file__), "..", "output")
+OUTPUT_DIR = os.path.join(os.path.dirname(__file__), "..", "output")
 
 MODEL = "claude-sonnet-4-6"
 
-TAILOR_SYSTEM = textwrap.dedent("""
+_TAILOR_SYSTEM_TEMPLATE = textwrap.dedent("""
     You are an expert resume writer and career coach specialising in QA / SDET / test automation roles.
     You will receive a candidate's resume, a job posting, and optionally a company context snippet.
 
@@ -76,7 +75,7 @@ TAILOR_SYSTEM = textwrap.dedent("""
     - Reword bullets to echo the job posting's language naturally, but keep the real specifics intact.
     - Prioritise the most relevant bullets for this job.
     - Preserve actual dates, companies, and titles exactly.
-    - Always include github.com/ademdeniz in the contact line.
+    - {github_instruction}
 
     COVER LETTER rules:
     - NO "Dear Hiring Manager" opener on its own line — weave it into the first sentence naturally OR skip it.
@@ -88,7 +87,7 @@ TAILOR_SYSTEM = textwrap.dedent("""
     - Closing paragraph: confident, specific call to action referencing the role by name.
     - Tone: direct and confident, not stiff or generic. No filler phrases.
     - NEVER use em dashes (—). Use a comma, period, or rewrite the sentence instead.
-    - End with: "Best regards,\n\nAdem Garic\nademdenizgaric@gmail.com | linkedin.com/in/adem-garic-sdet-qa"
+    - End with: "Best regards,\\n\\n{name}\\n{email}{linkedin_line}"
     - Length: 3-4 paragraphs total.
 
     GLOBAL FORMATTING RULE: Never use em dashes (—) anywhere in either document.
@@ -96,6 +95,29 @@ TAILOR_SYSTEM = textwrap.dedent("""
 
     Return ONLY the JSON object. No explanation, no markdown fences.
 """).strip()
+
+
+def _build_system_prompt(profile: dict) -> str:
+    name     = profile.get("name", "")
+    email    = profile.get("email", "")
+    linkedin = profile.get("linkedin", "").strip().rstrip("/")
+    github   = profile.get("github", "").strip().rstrip("/")
+
+    contact_parts = [c for c in [email, linkedin] if c]
+    linkedin_line = " | " + " | ".join(contact_parts[1:]) if len(contact_parts) > 1 else ""
+
+    github_instruction = (
+        f"Always include {github} in the contact line."
+        if github else "Include the candidate's GitHub URL in the contact line if available."
+    )
+
+    return (
+        _TAILOR_SYSTEM_TEMPLATE
+        .replace("{name}", name)
+        .replace("{email}", email)
+        .replace("{linkedin_line}", linkedin_line)
+        .replace("{github_instruction}", github_instruction)
+    )
 
 
 @dataclass
@@ -108,10 +130,19 @@ class TailorResult:
 
 
 def _load_resume() -> str:
-    if not os.path.exists(RESUME_PATH):
-        raise FileNotFoundError(f"resume.txt not found at {RESUME_PATH}")
-    with open(RESUME_PATH, encoding="utf-8") as f:
-        return f.read().strip()
+    """Load resume text from profile.json, falling back to resume.txt."""
+    import sys
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+    from storage.profile import load_profile
+    profile = load_profile()
+    if profile.get("resume", "").strip():
+        return profile["resume"].strip()
+    # Legacy fallback
+    resume_path = os.path.join(os.path.dirname(__file__), "..", "resume.txt")
+    if os.path.exists(resume_path):
+        with open(resume_path, encoding="utf-8") as f:
+            return f.read().strip()
+    raise FileNotFoundError("No resume found. Add your resume in the Profile page.")
 
 
 # Job aggregators — when the stored company is one of these,
@@ -212,6 +243,13 @@ def tailor_job(job: dict, resume_text: Optional[str] = None) -> TailorResult:
         if company_context else ""
     )
 
+    # Build system prompt from profile
+    import sys as _sys
+    _sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+    from storage.profile import load_profile as _load_profile
+    profile = _load_profile()
+    system_prompt = _build_system_prompt(profile)
+
     client = anthropic.Anthropic()
 
     user_msg = textwrap.dedent(f"""
@@ -230,7 +268,7 @@ def tailor_job(job: dict, resume_text: Optional[str] = None) -> TailorResult:
     message = client.messages.create(
         model=MODEL,
         max_tokens=4096,
-        system=TAILOR_SYSTEM,
+        system=system_prompt,
         messages=[{"role": "user", "content": user_msg}],
     )
 

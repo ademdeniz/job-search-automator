@@ -23,6 +23,7 @@ from storage.database import (
     get_unscored_jobs, get_jobs_without_description, stats, get_applied_jobs,
     delete_job,
 )
+from storage.profile import load_profile, save_profile
 
 # ── page config ──────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -102,7 +103,7 @@ with st.sidebar:
 
     page = st.radio(
         "Navigate",
-        ["📋 Job Board", "📊 Dashboard", "🔧 Actions", "📁 My Applications"],
+        ["📋 Job Board", "📊 Dashboard", "🔧 Actions", "📁 My Applications", "👤 Profile"],
         label_visibility="collapsed",
     )
 
@@ -762,3 +763,53 @@ elif page == "📁 My Applications":
                         height=100,
                         placeholder="e.g. Phone screen with Sarah on Apr 10, asked about Appium experience…",
                     )
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# PAGE: PROFILE
+# ════════════════════════════════════════════════════════════════════════════
+elif page == "👤 Profile":
+    st.title("👤 Profile")
+    st.caption("Your info is used for resume tailoring and cover letter generation.")
+
+    profile = load_profile()
+
+    st.subheader("Contact Info")
+    c1, c2 = st.columns(2)
+    with c1:
+        p_name     = st.text_input("Full name",  value=profile.get("name", ""))
+        p_email    = st.text_input("Email",       value=profile.get("email", ""))
+        p_location = st.text_input("Location",   value=profile.get("location", ""),
+                                   placeholder="e.g. Erie, PA")
+    with c2:
+        p_linkedin = st.text_input("LinkedIn URL", value=profile.get("linkedin", ""),
+                                   placeholder="linkedin.com/in/your-handle")
+        p_github   = st.text_input("GitHub URL",   value=profile.get("github", ""),
+                                   placeholder="github.com/yourhandle")
+        p_website  = st.text_input("Website / Portfolio", value=profile.get("website", ""),
+                                   placeholder="yourportfolio.com (optional)")
+
+    st.divider()
+    st.subheader("Resume")
+    st.caption("Paste your full resume as plain text. This is what Claude uses for tailoring.")
+    p_resume = st.text_area(
+        "Resume text",
+        value=profile.get("resume", ""),
+        height=500,
+        label_visibility="collapsed",
+        placeholder="Paste your resume here…",
+    )
+
+    st.divider()
+    if st.button("💾 Save Profile", type="primary"):
+        save_profile({
+            "name":     p_name.strip(),
+            "email":    p_email.strip(),
+            "linkedin": p_linkedin.strip(),
+            "github":   p_github.strip(),
+            "website":  p_website.strip(),
+            "location": p_location.strip(),
+            "resume":   p_resume.strip(),
+        })
+        st.success("Profile saved. All future tailoring will use this info.")
+        st.rerun()
