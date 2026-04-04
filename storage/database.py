@@ -145,13 +145,26 @@ def get_unscored_jobs() -> List[dict]:
 
 
 def clear_jobs() -> int:
-    """Delete all jobs. Returns count of deleted rows."""
+    """Delete only new/rejected jobs — preserves applied, interviewing, and offer records.
+    Returns count of deleted rows."""
     conn = get_connection()
-    n = conn.execute("SELECT COUNT(*) FROM jobs").fetchone()[0]
-    conn.execute("DELETE FROM jobs")
+    n = conn.execute(
+        "SELECT COUNT(*) FROM jobs WHERE status IN ('new', 'rejected')"
+    ).fetchone()[0]
+    conn.execute("DELETE FROM jobs WHERE status IN ('new', 'rejected')")
     conn.commit()
     conn.close()
     return n
+
+
+def get_applied_jobs() -> list:
+    """Return all jobs that are in-progress (applied / interviewing / offer)."""
+    conn = get_connection()
+    rows = conn.execute(
+        "SELECT * FROM jobs WHERE status IN ('applied', 'interviewing', 'offer') ORDER BY scraped_at DESC"
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
 
 
 def stats() -> dict:

@@ -20,7 +20,7 @@ import pandas as pd
 sys.path.insert(0, os.path.dirname(__file__))
 from storage.database import (
     get_all_jobs, get_job_by_id, update_status, save_score,
-    get_unscored_jobs, get_jobs_without_description, stats,
+    get_unscored_jobs, get_jobs_without_description, stats, get_applied_jobs,
 )
 
 # ── page config ──────────────────────────────────────────────────────────────
@@ -111,6 +111,16 @@ with st.sidebar:
     col1, col2 = st.columns(2)
     col1.metric("Scored", db_stats.get("scored", 0))
     col2.metric("Avg Score", f"{db_stats.get('avg_score', 0):.0f}")
+
+    st.divider()
+    st.caption("🗂️ Application Tracker")
+    _ap = db_stats["by_status"]
+    t1, t2, t3 = st.columns(3)
+    t1.metric("Applied", _ap.get("applied", 0))
+    t2.metric("Interview", _ap.get("interviewing", 0))
+    t3.metric("Offer", _ap.get("offer", 0))
+    if _ap.get("applied", 0) + _ap.get("interviewing", 0) + _ap.get("offer", 0) > 0:
+        st.caption("✅ Preserved on fresh search")
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -428,9 +438,10 @@ elif page == "🔧 Actions":
             days_ago = days_ago_map[freshness]
 
         fresh_search = st.checkbox(
-            "🗑️ Fresh search — clear all existing jobs first",
+            "🗑️ Fresh search — clear new/rejected jobs first",
             value=False,
-            help="Deletes everything in the database before scraping so you start clean.",
+            help="Removes jobs with status 'new' or 'rejected' before scraping. "
+                 "Applied, interviewing, and offer records are always preserved.",
         )
 
         if st.button("▶ Run Scrape", type="primary"):
