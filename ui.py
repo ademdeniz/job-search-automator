@@ -327,6 +327,23 @@ if page == "📋 Job Board":
                         files = st.session_state[state_key]
                         if files.get("log"):
                             st.code(files["log"])
+
+                        # ── ATS check badge ───────────────────────────────
+                        log = files.get("log", "")
+                        if "[ATS] ✅" in log:
+                            st.success("ATS Check: Resume passed")
+                        elif "[ATS] ⚠️" in log:
+                            # Extract issue lines from the log
+                            issues = [
+                                line.strip().lstrip("•").strip()
+                                for line in log.splitlines()
+                                if line.strip().startswith("•")
+                            ]
+                            st.warning(
+                                "ATS Check: Issues found\n"
+                                + ("\n".join(f"• {i}" for i in issues) if issues else "")
+                            )
+
                         dl_col1, dl_col2 = st.columns(2)
                         co = files.get("company", job["company"]).replace(" ", "_")
                         if files.get("resume") and os.path.exists(files["resume"]):
