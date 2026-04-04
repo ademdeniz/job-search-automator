@@ -468,15 +468,22 @@ elif page == "🔧 Actions":
             )
             location_mode = st.radio(
                 "Location mode",
-                ["🇺🇸 US Remote only", "🌐 World Remote", "📍 Erie PA (local / hybrid)", "🔀 Both (US Remote + Erie)"],
+                ["🇺🇸 US Remote only", "🌐 World Remote", "📍 Local / Hybrid", "🔀 Both (US Remote + Local)"],
                 index=0,
                 help=(
                     "US Remote: remote jobs limited to United States.\n"
                     "World Remote: remote jobs worldwide (no country filter).\n"
-                    "Erie PA: LinkedIn + Indeed for on-site / hybrid roles near Erie, PA.\n"
-                    "Both: US Remote + Erie PA in sequence."
+                    "Local / Hybrid: LinkedIn + Indeed near your specified location.\n"
+                    "Both: US Remote + local in sequence."
                 ),
             )
+            local_location = ""
+            if location_mode in ("📍 Local / Hybrid", "🔀 Both (US Remote + Local)"):
+                local_location = st.text_input(
+                    "Location (city, state or zip code)",
+                    value="Erie, PA",
+                    placeholder="e.g. Pittsburgh, PA  or  16509",
+                )
         with s_col2:
             sources_input = st.multiselect(
                 "Sources  (LinkedIn & Indeed first)",
@@ -518,8 +525,8 @@ elif page == "🔧 Actions":
                 days_args = ["--days-ago", str(days_ago)] if days_ago else []
 
                 # ── remote pass ───────────────────────────────────────────
-                if location_mode in ("🇺🇸 US Remote only", "🌐 World Remote", "🔀 Both (US Remote + Erie)"):
-                    remote_location = "Remote US" if location_mode in ("🇺🇸 US Remote only", "🔀 Both (US Remote + Erie)") else "Remote"
+                if location_mode in ("🇺🇸 US Remote only", "🌐 World Remote", "🔀 Both (US Remote + Local)"):
+                    remote_location = "Remote US" if location_mode in ("🇺🇸 US Remote only", "🔀 Both (US Remote + Local)") else "Remote"
                     label = "US remote" if remote_location == "Remote US" else "worldwide remote"
                     with st.spinner(f"Scraping {label} jobs…"):
                         out = run_cli(
@@ -532,22 +539,24 @@ elif page == "🔧 Actions":
                         )
                     output_lines.append(f"── Remote pass ({label}) ──\n" + out)
 
-                # ── Erie PA pass ──────────────────────────────────────────
-                if location_mode in ("📍 Erie PA (local / hybrid)", "🔀 Both (US Remote + Erie)"):
-                    erie_sources = [s for s in ERIE_SOURCES if s in sources_input]
-                    if erie_sources:
-                        with st.spinner("Scraping Erie PA local / hybrid jobs (LinkedIn + Indeed)…"):
+                # ── Local / hybrid pass ───────────────────────────────────
+                if location_mode in ("📍 Local / Hybrid", "🔀 Both (US Remote + Local)"):
+                    local_sources = [s for s in ERIE_SOURCES if s in sources_input]
+                    if not local_location.strip():
+                        output_lines.append("⚠️ Local pass skipped — enter a location above.")
+                    elif local_sources:
+                        with st.spinner(f"Scraping local / hybrid jobs near {local_location}…"):
                             out = run_cli(
                                 ["main.py", "scrape"]
                                 + kw_args
-                                + ["--location", "Erie, PA"]
-                                + src_args_erie
+                                + ["--location", local_location.strip()]
+                                + ["--sources"] + local_sources
                                 + max_args
                                 + days_args
                             )
-                        output_lines.append("── Erie PA pass ──\n" + out)
+                        output_lines.append(f"── Local pass ({local_location.strip()}) ──\n" + out)
                     else:
-                        output_lines.append("⚠️ Erie PA pass skipped — LinkedIn and/or Indeed must be selected.")
+                        output_lines.append("⚠️ Local pass skipped — LinkedIn and/or Indeed must be selected.")
 
                 st.code("\n\n".join(output_lines))
                 st.rerun()
