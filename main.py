@@ -442,7 +442,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_tailor.add_argument("job_id", type=int, help="Job ID from the database")
 
     # --- clear ---
-    sub.add_parser("clear", help="Delete all jobs from the database.")
+    sub.add_parser("clear", help="Delete new/rejected jobs (preserves applied, interviewing, offer).")
 
     return parser
 
