@@ -105,7 +105,7 @@ with st.sidebar:
 
     page = st.radio(
         "Navigate",
-        ["📋 Job Board", "📊 Dashboard", "🔧 Actions", "📁 My Applications", "👤 Profile"],
+        ["👤 Profile", "📋 Job Board", "📊 Dashboard", "🔧 Actions", "📁 My Applications"],
         label_visibility="collapsed",
     )
 
@@ -125,6 +125,17 @@ with st.sidebar:
     t3.metric("Offer", _ap.get("offer", 0))
     if _ap.get("applied", 0) + _ap.get("interviewing", 0) + _ap.get("offer", 0) > 0:
         st.caption("✅ Preserved on fresh search")
+
+
+# ── profile completeness check ────────────────────────────────────────────────
+_profile = load_profile()
+_profile_complete = bool(_profile.get("name") and _profile.get("resume"))
+if not _profile_complete and page != "👤 Profile":
+    st.warning(
+        "**Complete your profile first.** "
+        "Go to **👤 Profile** in the sidebar to add your name, contact info, and resume. "
+        "Scoring and tailoring won't work without it."
+    )
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -461,13 +472,15 @@ elif page == "🔧 Actions":
     # ── scrape ────────────────────────────────────────────────────────────────
     with st.expander("🕷️ Scrape Jobs", expanded=True):
         st.markdown("Search job boards and pull new listings into the database.")
+        st.caption("ℹ️ Greenhouse and Lever use a curated list of QA/SDET-friendly companies. For other fields, use LinkedIn, Indeed, RemoteOK, and Dice.")
 
         s_col1, s_col2 = st.columns(2)
         with s_col1:
+            _default_kw = load_profile().get("target_role", "") or "QA engineer SDET test automation"
             keywords_input = st.text_input(
                 "Keywords",
-                value="QA engineer SDET quality assurance test automation",
-                help="Space-separated keywords",
+                value=_default_kw,
+                help="Space-separated keywords — set your default in the Profile page.",
             )
             location_mode = st.radio(
                 "Location mode",
@@ -779,10 +792,16 @@ elif page == "👤 Profile":
     st.subheader("Contact Info")
     c1, c2 = st.columns(2)
     with c1:
-        p_name     = st.text_input("Full name",  value=profile.get("name", ""))
-        p_email    = st.text_input("Email",       value=profile.get("email", ""))
-        p_location = st.text_input("Location",   value=profile.get("location", ""),
-                                   placeholder="e.g. Erie, PA")
+        p_name        = st.text_input("Full name",    value=profile.get("name", ""))
+        p_email       = st.text_input("Email",         value=profile.get("email", ""))
+        p_location    = st.text_input("Location",     value=profile.get("location", ""),
+                                      placeholder="e.g. Erie, PA")
+        p_target_role = st.text_input(
+            "Target role / keywords",
+            value=profile.get("target_role", ""),
+            placeholder="e.g. SDET test automation Appium",
+            help="Used as the default search keywords when scraping jobs.",
+        )
     with c2:
         p_linkedin = st.text_input("LinkedIn URL", value=profile.get("linkedin", ""),
                                    placeholder="linkedin.com/in/your-handle")
@@ -805,13 +824,14 @@ elif page == "👤 Profile":
     st.divider()
     if st.button("💾 Save Profile", type="primary"):
         save_profile({
-            "name":     p_name.strip(),
-            "email":    p_email.strip(),
-            "linkedin": p_linkedin.strip(),
-            "github":   p_github.strip(),
-            "website":  p_website.strip(),
-            "location": p_location.strip(),
-            "resume":   p_resume.strip(),
+            "name":        p_name.strip(),
+            "email":       p_email.strip(),
+            "linkedin":    p_linkedin.strip(),
+            "github":      p_github.strip(),
+            "website":     p_website.strip(),
+            "location":    p_location.strip(),
+            "target_role": p_target_role.strip(),
+            "resume":      p_resume.strip(),
         })
         st.success("Profile saved. All future tailoring will use this info.")
         st.rerun()

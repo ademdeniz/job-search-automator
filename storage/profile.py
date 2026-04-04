@@ -11,13 +11,14 @@ import os
 PROFILE_PATH = os.path.join(os.path.dirname(__file__), "..", "profile.json")
 
 DEFAULT_PROFILE = {
-    "name":     "",
-    "email":    "",
-    "linkedin": "",
-    "github":   "",
-    "website":  "",
-    "location": "",
-    "resume":   "",
+    "name":        "",
+    "email":       "",
+    "linkedin":    "",
+    "github":      "",
+    "website":     "",
+    "location":    "",
+    "target_role": "",
+    "resume":      "",
 }
 
 
