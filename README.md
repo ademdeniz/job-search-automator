@@ -178,7 +178,7 @@ python main.py export               # export all jobs to CSV
 python main.py clear                # delete new/rejected jobs (preserves applied+)
 ```
 
-Valid statuses: `new` · `applied` · `interviewing` · `offer` · `rejected`
+Valid statuses: `new` · `applied` · `interviewing` · `offer`
 
 ---
 
@@ -188,7 +188,7 @@ Valid statuses: `new` · `applied` · `interviewing` · `offer` · `rejected`
 job-search-automator/
 ├── main.py               # CLI entry point — all commands
 ├── start.sh              # Launch UI: ./start.sh
-├── profile.json          # Your profile — resume, contact info, links
+├── profile.json          # Your profile — created on first save in UI (gitignored)
 ├── requirements.txt
 │
 ├── scrapers/
