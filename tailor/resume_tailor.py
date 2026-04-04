@@ -87,8 +87,12 @@ TAILOR_SYSTEM = textwrap.dedent("""
       and project names — make it sound like the candidate, not a template.
     - Closing paragraph: confident, specific call to action referencing the role by name.
     - Tone: direct and confident, not stiff or generic. No filler phrases.
+    - NEVER use em dashes (—). Use a comma, period, or rewrite the sentence instead.
     - End with: "Best regards,\n\nAdem Garic\nademdenizgaric@gmail.com | linkedin.com/in/adem-garic-sdet-qa"
     - Length: 3-4 paragraphs total.
+
+    GLOBAL FORMATTING RULE: Never use em dashes (—) anywhere in either document.
+    They are an immediate AI tell. Rewrite any sentence that would need one.
 
     Return ONLY the JSON object. No explanation, no markdown fences.
 """).strip()
@@ -247,6 +251,10 @@ def tailor_job(job: dict, resume_text: Optional[str] = None) -> TailorResult:
     cover_letter    = data.get("cover_letter", "").strip()
     # Use Claude's identified real company — never an aggregator name
     real_company    = data.get("real_company", "").strip() or company
+
+    # Strip em dashes — an immediate AI tell. Replace with a plain hyphen-minus.
+    tailored_resume = tailored_resume.replace("\u2014", "-").replace("\u2013", "-")
+    cover_letter    = cover_letter.replace("\u2014", "-").replace("\u2013", "-")
 
     slug    = _slug(title, real_company)
     out_dir = os.path.join(OUTPUT_DIR, slug)
