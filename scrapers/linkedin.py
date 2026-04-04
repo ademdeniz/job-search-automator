@@ -1,4 +1,4 @@
-# Copyright (c) 2025 Adem Garic. All rights reserved.
+# Copyright (c) 2026 Adem Garic. All rights reserved.
 # Unauthorized use, copying, or distribution is prohibited. See LICENSE.
 """
 LinkedIn job scraper using Playwright (headless Chromium).

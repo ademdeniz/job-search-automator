@@ -1,6 +1,6 @@
 # Job Search Automator
 
-> **© 2025 Adem Garic — All Rights Reserved.**
+> **© 2026 Adem Garic — All Rights Reserved.**
 > View-only. No use, copying, or distribution without written permission. See [LICENSE](LICENSE).
 
 ---
