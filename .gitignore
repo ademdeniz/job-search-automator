@@ -20,3 +20,4 @@ profile.json
 # OS
 .DS_Store
 output/
+.claude/
