@@ -1,3 +1,5 @@
+# Copyright (c) 2026 Adem Garic. All rights reserved.
+# Unauthorized use, copying, or distribution is prohibited. See LICENSE.
 """
 Dice.com job scraper using Playwright (headless Chromium).
 
@@ -84,7 +86,7 @@ class DiceScraper(BaseScraper):
                     seen_urls.add(href)
 
                     job = _parse_from_link(page, link, href)
-                    if job:
+                    if job and self._title_matches_keywords(job.title):
                         jobs.append(job)
 
                 # Next page button
