@@ -469,6 +469,17 @@ elif page == "🔧 Actions":
     st.title("🔧 Actions")
     st.caption("Run scraping, scoring, and fetching operations directly from the UI.")
 
+    # ── post-scrape result banner (persists after rerun) ──────────────────────
+    if "last_scrape_count" in st.session_state:
+        count = st.session_state["last_scrape_count"]
+        st.success(
+            f"Done! Found **{count} new job(s)** in the database. "
+            f"Go to **📋 Job Board** to review and start applying."
+        )
+        if st.button("Dismiss", key="dismiss_scrape_banner"):
+            del st.session_state["last_scrape_count"]
+            st.rerun()
+
     # ── scrape ────────────────────────────────────────────────────────────────
     with st.expander("🕷️ Scrape Jobs", expanded=True):
         st.markdown("Search job boards and pull new listings into the database.")
@@ -577,12 +588,9 @@ elif page == "🔧 Actions":
 
                 st.code("\n\n".join(output_lines))
 
-                # ── post-scrape summary ───────────────────────────────────
+                # ── post-scrape summary — store in state so it survives reruns ──
                 new_jobs = get_all_jobs(status="new")
-                st.success(
-                    f"Done! Found **{len(new_jobs)} new job(s)** in the database. "
-                    f"Go to **📋 Job Board** to review and start applying."
-                )
+                st.session_state["last_scrape_count"] = len(new_jobs)
                 st.rerun()
 
     # ── fetch descriptions ────────────────────────────────────────────────────

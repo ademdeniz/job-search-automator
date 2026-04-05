@@ -78,6 +78,8 @@ class IndeedScraper(BaseScraper):
                         break
                     job = _parse_card(card)
                     if job and job.url and job.url not in seen_urls:
+                        if not self._title_matches_keywords(job.title):
+                            continue
                         seen_urls.add(job.url)
                         jobs.append(job)
 
