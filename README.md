@@ -57,6 +57,11 @@ pip install -r requirements.txt
 python -m playwright install chromium
 ```
 
+> **Linux / WSL users:** Playwright needs system dependencies. Run this first:
+> ```bash
+> playwright install-deps chromium
+> ```
+
 ### 3. Add your Anthropic API key
 
 The `score` and `tailor` commands call Claude AI. Get a key at [console.anthropic.com](https://console.anthropic.com).
@@ -67,13 +72,21 @@ export ANTHROPIC_API_KEY=sk-ant-...
 
 To make it permanent, add the line above to your `~/.zshrc` or `~/.bashrc`.
 
-### 4. Set up your profile
-
-Launch the UI and open the **Profile** page. Enter your name, email, LinkedIn, GitHub, and paste your full resume as plain text. This is what Claude uses for scoring and tailoring — no file editing required.
+### 4. Launch the UI and set up your profile
 
 ```bash
 ./start.sh
 ```
+
+This opens the dashboard at **http://localhost:8501**.
+
+**Before doing anything else, go to the 👤 Profile page** and fill in:
+- Your name, email, LinkedIn, GitHub
+- Target role / keywords (e.g. `SDET test automation Appium`) — used as default search terms
+- Your full resume as plain text
+
+Hit **Save Profile**. This creates `profile.json` locally (gitignored — stays on your machine).
+Scoring and tailoring will not work until the profile is saved.
 
 ---
 
