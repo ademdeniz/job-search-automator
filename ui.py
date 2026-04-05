@@ -476,9 +476,11 @@ elif page == "🔧 Actions":
         s_col1, s_col2 = st.columns(2)
         with s_col1:
             _default_kw = load_profile().get("target_role", "") or "QA engineer SDET test automation"
+            if "scrape_keywords" not in st.session_state:
+                st.session_state["scrape_keywords"] = _default_kw
             keywords_input = st.text_input(
                 "Keywords",
-                value=_default_kw,
+                key="scrape_keywords",
                 help="Space-separated keywords — set your default in the Profile page.",
             )
             location_mode = st.radio(
