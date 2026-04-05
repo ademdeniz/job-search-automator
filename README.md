@@ -70,7 +70,24 @@ The `score` and `tailor` commands call Claude AI. Get a key at [console.anthropi
 export ANTHROPIC_API_KEY=sk-ant-...
 ```
 
-To make it permanent, add the line above to your `~/.zshrc` or `~/.bashrc`.
+To make it permanent so you don't have to re-enter it every session:
+
+**Mac (zsh):**
+```bash
+echo 'export ANTHROPIC_API_KEY=sk-ant-...' >> ~/.zshrc
+source ~/.zshrc
+```
+
+**Linux (bash):**
+```bash
+echo 'export ANTHROPIC_API_KEY=sk-ant-...' >> ~/.bashrc
+source ~/.bashrc
+```
+
+Replace `sk-ant-...` with your actual key. You can verify it was saved with:
+```bash
+echo $ANTHROPIC_API_KEY
+```
 
 ### 4. Launch the UI and set up your profile
 
