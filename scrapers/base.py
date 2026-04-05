@@ -11,6 +11,8 @@ _GENERIC_WORDS = {
     "engineer", "developer", "manager", "analyst", "specialist",
     "lead", "senior", "junior", "mid", "staff", "principal",
     "associate", "director", "head", "officer", "coordinator",
+    "automation", "digital", "technology", "solutions", "systems",
+    "platform", "ai", "data", "software", "technical",
 }
 
 # Non-US place names — if any appear in a job's location we exclude it in US-only mode.
@@ -68,8 +70,8 @@ class BaseScraper(ABC):
         """
         t = title.lower()
         meaningful = [kw for kw in self.keywords if kw.lower() not in _GENERIC_WORDS]
-        # If all keywords are generic, fall back to using all of them
-        candidates = meaningful or self.keywords
+        # If truly no meaningful keywords, fall back to all (edge case)
+        candidates = meaningful if meaningful else self.keywords
         for kw in candidates:
             kw_l = kw.lower()
             if len(kw_l) <= 4:

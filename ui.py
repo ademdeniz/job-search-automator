@@ -576,6 +576,13 @@ elif page == "🔧 Actions":
                         output_lines.append("⚠️ Local pass skipped — LinkedIn and/or Indeed must be selected.")
 
                 st.code("\n\n".join(output_lines))
+
+                # ── post-scrape summary ───────────────────────────────────
+                new_jobs = get_all_jobs(status="new")
+                st.success(
+                    f"Done! Found **{len(new_jobs)} new job(s)** in the database. "
+                    f"Go to **📋 Job Board** to review and start applying."
+                )
                 st.rerun()
 
     # ── fetch descriptions ────────────────────────────────────────────────────
