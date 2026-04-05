@@ -1,35 +1,26 @@
+# Copyright (c) 2026 Adem Garic. All rights reserved.
+# Unauthorized use, copying, or distribution is prohibited. See LICENSE.
 """
 Greenhouse ATS scraper using the public Greenhouse boards API.
 
 Many tech companies post jobs via Greenhouse and expose a public JSON API
 at boards-api.greenhouse.io — no authentication required.
 
-We maintain a curated list of companies known to hire QA/SDET engineers
-and query each one's board, filtering results by keyword.
+We maintain a curated list of tech companies and filter job titles against
+the user's own search keywords, so this works for any role or field.
 """
 
+import re
 import requests
 from typing import List
-import re
 
 from models.job import Job
 from .base import BaseScraper
 
 API_BASE = "https://boards-api.greenhouse.io/v1/boards/{company}/jobs"
 
-# Terms that must appear in the job title for it to be considered a QA/SDET role.
-# Deliberately narrow — "engineer" alone is too broad and matches hundreds of unrelated roles.
-QA_TITLE_TERMS = {
-    "qa", "qe", "sdet", "quality assurance", "quality engineer",
-    "test automation", "automation engineer", "automation tester",
-    "test engineer", "software tester", "quality analyst",
-    "testing engineer", "manual tester", "software quality",
-    "quality control", "qc engineer", "test lead", "qa lead",
-}
-
-# Curated list of tech companies that use Greenhouse and commonly hire QA/SDET.
-# Add more company slugs here as needed.
-QA_FRIENDLY_COMPANIES = [
+# Curated list of tech companies that use Greenhouse.
+COMPANIES = [
     "anthropic", "stripe", "shopify", "airbnb", "dropbox", "zendesk",
     "datadog", "pagerduty", "twilio", "figma", "notion", "linear",
     "vercel", "supabase", "retool", "brex", "ramp", "scale",
@@ -46,7 +37,7 @@ QA_FRIENDLY_COMPANIES = [
     "sendgrid", "mailchimp", "klaviyo", "iterable",
     "intercom", "freshworks", "helpscout", "front",
     "greenhouse", "lever", "workday", "bamboohr",
-    "navan", "expensify", "brex", "mercury",
+    "navan", "expensify",
     "faire", "shipbob", "flexport", "project44",
     "duolingo", "coursera", "instructure", "kahoot",
     "calm", "headspace", "hims", "ro", "tempus",
@@ -55,13 +46,12 @@ QA_FRIENDLY_COMPANIES = [
 
 
 class GreenhouseScraper(BaseScraper):
-    """Scrapes Greenhouse ATS boards for QA/SDET roles."""
+    """Scrapes Greenhouse ATS boards, filtering by user keywords."""
 
     def scrape(self) -> List[Job]:
-        query_terms = [kw.lower() for kw in self.keywords]
         jobs: List[Job] = []
 
-        for company in QA_FRIENDLY_COMPANIES:
+        for company in COMPANIES:
             if len(jobs) >= self.max_results:
                 break
             try:
@@ -83,10 +73,8 @@ class GreenhouseScraper(BaseScraper):
 
                 title = post.get("title", "")
 
-                # Filter on title — must match a QA-specific term, not just any keyword.
-                # Using user keywords alone is too broad ("engineer" matches everything).
-                title_lower = title.lower()
-                if not any(t in title_lower for t in QA_TITLE_TERMS):
+                # Filter on title using the user's own keywords (field-agnostic).
+                if not self._title_matches_keywords(title):
                     continue
 
                 # Date filter
@@ -94,7 +82,6 @@ class GreenhouseScraper(BaseScraper):
                     continue
 
                 content = post.get("content", "") or ""
-                # Unescape HTML entities then strip tags
                 import html as html_module
                 content = html_module.unescape(content)
                 description = re.sub(r"<[^>]+>", " ", content).strip()
@@ -104,7 +91,10 @@ class GreenhouseScraper(BaseScraper):
                 location = location_data.get("name", "") if location_data else ""
 
                 # Location filter
-                if self.location and self.location.lower() not in ("remote", "anywhere", ""):
+                if self.us_remote_only:
+                    if not self._is_us_compatible(location):
+                        continue
+                elif self.location and self.location.lower() not in ("remote", "anywhere", ""):
                     if self.location.lower() not in location.lower():
                         continue
 
@@ -116,7 +106,7 @@ class GreenhouseScraper(BaseScraper):
                     location=location or "Unknown",
                     source="greenhouse",
                     url=post.get("absolute_url", ""),
-                    description=description[:3000],  # cap to avoid huge payloads
+                    description=description[:3000],
                     remote=remote,
                     posted_date=post.get("updated_at", ""),
                 ))

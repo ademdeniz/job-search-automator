@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 Adem Garic. All rights reserved.
+# Unauthorized use, copying, or distribution is prohibited. See LICENSE.
 """
 Job Search Automator — CLI entry point.
 
@@ -36,6 +38,8 @@ from scrapers.weworkremotely import WeWorkRemotelyScraper
 from scrapers.dice import DiceScraper
 from scrapers.greenhouse import GreenhouseScraper
 from scrapers.lever import LeverScraper
+from scrapers.himalayas import HimalayanScraper
+from scrapers.jobspresso import JobspressoScraper
 
 SCRAPERS = {
     "remoteok":       RemoteOKScraper,
@@ -45,6 +49,8 @@ SCRAPERS = {
     "dice":           DiceScraper,
     "greenhouse":     GreenhouseScraper,
     "lever":          LeverScraper,
+    "himalayas":      HimalayanScraper,
+    "jobspresso":     JobspressoScraper,
 }
 
 VALID_STATUSES = {"new", "applied", "rejected", "interviewing", "offer"}

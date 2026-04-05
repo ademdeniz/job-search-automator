@@ -1,3 +1,5 @@
+# Copyright (c) 2026 Adem Garic. All rights reserved.
+# Unauthorized use, copying, or distribution is prohibited. See LICENSE.
 """
 WeWorkRemotely scraper via their public RSS feeds.
 
@@ -16,15 +18,6 @@ from .base import BaseScraper
 
 # Programming/dev/QA jobs only (narrower than the all-jobs feed)
 RSS_URL = "https://weworkremotely.com/categories/remote-programming-jobs.rss"
-
-# QA-specific terms — "test" alone matches too many non-QA roles
-QA_TITLE_TERMS = {
-    "qa", "qe", "sdet", "quality assurance", "quality engineer",
-    "test automation", "automation engineer", "automation tester",
-    "test engineer", "software tester", "quality analyst",
-    "testing engineer", "manual tester", "software quality",
-    "quality control", "qc engineer", "test lead", "qa lead",
-}
 
 
 class WeWorkRemotelyScraper(BaseScraper):
@@ -46,7 +39,6 @@ class WeWorkRemotelyScraper(BaseScraper):
             return []
 
         items = root.findall(".//item")
-        query_terms = [kw.lower() for kw in self.keywords]
         jobs: List[Job] = []
 
         for item in items:
@@ -79,8 +71,7 @@ class WeWorkRemotelyScraper(BaseScraper):
                 except Exception:
                     pass
 
-            # Must match a QA-specific term in the title (broad keyword match is too noisy)
-            if not any(t in title.lower() for t in QA_TITLE_TERMS):
+            if not self._title_matches_keywords(title):
                 continue
 
             jobs.append(Job(

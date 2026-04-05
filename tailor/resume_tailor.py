@@ -1,3 +1,5 @@
+# Copyright (c) 2026 Adem Garic. All rights reserved.
+# Unauthorized use, copying, or distribution is prohibited. See LICENSE.
 """
 Resume Tailor + Cover Letter Generator using Claude API.
 
@@ -24,14 +26,13 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml.ns import qn
 from docx.oxml import OxmlElement
 
-RESUME_PATH = os.path.join(os.path.dirname(__file__), "..", "resume.txt")
-OUTPUT_DIR  = os.path.join(os.path.dirname(__file__), "..", "output")
+OUTPUT_DIR = os.path.join(os.path.dirname(__file__), "..", "output")
 
 MODEL = "claude-sonnet-4-6"
 
-TAILOR_SYSTEM = textwrap.dedent("""
+_TAILOR_SYSTEM_TEMPLATE = textwrap.dedent("""
     You are an expert resume writer and career coach specialising in QA / SDET / test automation roles.
-    You will receive a candidate's resume and a job posting.
+    You will receive a candidate's resume, a job posting, and optionally a company context snippet.
 
     Your task is to produce TWO documents, returned as a single JSON object (no markdown fences):
 
@@ -66,24 +67,59 @@ TAILOR_SYSTEM = textwrap.dedent("""
     <<<SECTION: LANGUAGES>>>
     Languages line
 
-    Rules:
+    RESUME BULLET RULES — critical:
+    - Use the EXACT metrics, numbers, and project names from the candidate's resume. Never round or genericise.
+      If the resume says "20+ test cases", write "20+ test cases". If it says "Appium-based mobile automation
+      framework from scratch for iOS and Android", reference that specific framework by name.
+    - Surface the most impressive concrete outcomes first (built X, reduced Y, saved Z).
+    - Every bullet must start with a strong past-tense action verb and include at least one specific detail.
     - Keep ALL real experience — do not invent anything.
-    - Reword bullets to echo the job posting's language naturally.
+    - Reword bullets to echo the job posting's language naturally, but keep the real specifics intact.
     - Prioritise the most relevant bullets for this job.
     - Preserve actual dates, companies, and titles exactly.
-    - Always include github.com/ademdeniz in the contact line.
+    - {github_instruction}
 
     COVER LETTER rules:
     - NO "Dear Hiring Manager" opener on its own line — weave it into the first sentence naturally OR skip it.
-    - Opening paragraph: lead with a strong hook connecting the candidate's background to this specific role/company.
-    - Middle 1-2 paragraphs: 2-3 concrete achievements that map directly to the job requirements.
-    - Closing paragraph: confident, specific call to action.
+    - Opening paragraph: lead with a strong hook that mentions the company BY NAME and what specifically
+      draws the candidate to them (use the Company Context if provided — reference their product, mission,
+      or tech stack specifically). Do NOT use generic phrases like "I am excited to apply".
+    - Middle 1-2 paragraphs: 2-3 concrete achievements pulled DIRECTLY from the resume with exact metrics
+      and project names — make it sound like the candidate, not a template.
+    - Closing paragraph: confident, specific call to action referencing the role by name.
     - Tone: direct and confident, not stiff or generic. No filler phrases.
-    - End with: "Best regards,\n\nAdem Garic\nademdenizgaric@gmail.com | linkedin.com/in/adem-garic-sdet-qa"
+    - NEVER use em dashes (—). Use a comma, period, or rewrite the sentence instead.
+    - End with: "Best regards,\\n\\n{name}\\n{email}{linkedin_line}"
     - Length: 3-4 paragraphs total.
+
+    GLOBAL FORMATTING RULE: Never use em dashes (—) anywhere in either document.
+    They are an immediate AI tell. Rewrite any sentence that would need one.
 
     Return ONLY the JSON object. No explanation, no markdown fences.
 """).strip()
+
+
+def _build_system_prompt(profile: dict) -> str:
+    name     = profile.get("name", "")
+    email    = profile.get("email", "")
+    linkedin = profile.get("linkedin", "").strip().rstrip("/")
+    github   = profile.get("github", "").strip().rstrip("/")
+
+    contact_parts = [c for c in [email, linkedin] if c]
+    linkedin_line = " | " + " | ".join(contact_parts[1:]) if len(contact_parts) > 1 else ""
+
+    github_instruction = (
+        f"Always include {github} in the contact line."
+        if github else "Include the candidate's GitHub URL in the contact line if available."
+    )
+
+    return (
+        _TAILOR_SYSTEM_TEMPLATE
+        .replace("{name}", name)
+        .replace("{email}", email)
+        .replace("{linkedin_line}", linkedin_line)
+        .replace("{github_instruction}", github_instruction)
+    )
 
 
 @dataclass
@@ -96,10 +132,19 @@ class TailorResult:
 
 
 def _load_resume() -> str:
-    if not os.path.exists(RESUME_PATH):
-        raise FileNotFoundError(f"resume.txt not found at {RESUME_PATH}")
-    with open(RESUME_PATH, encoding="utf-8") as f:
-        return f.read().strip()
+    """Load resume text from profile.json, falling back to resume.txt."""
+    import sys
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+    from storage.profile import load_profile
+    profile = load_profile()
+    if profile.get("resume", "").strip():
+        return profile["resume"].strip()
+    # Legacy fallback
+    resume_path = os.path.join(os.path.dirname(__file__), "..", "resume.txt")
+    if os.path.exists(resume_path):
+        with open(resume_path, encoding="utf-8") as f:
+            return f.read().strip()
+    raise FileNotFoundError("No resume found. Add your resume in the Profile page.")
 
 
 # Job aggregators — when the stored company is one of these,
@@ -120,6 +165,52 @@ def _slug(title: str, company: str) -> str:
     return re.sub(r"[^a-z0-9]+", "_", raw.lower()).strip("_")[:60]
 
 
+# Domains that host job postings but aren't the actual company site.
+_JOB_BOARD_DOMAINS = {
+    "greenhouse.io", "boards.greenhouse.io", "lever.co", "jobs.lever.co",
+    "linkedin.com", "indeed.com", "dice.com", "remoteok.com",
+    "weworkremotely.com", "remoteok.io", "glassdoor.com", "ziprecruiter.com",
+}
+
+
+def _fetch_company_context(job_url: str) -> str:
+    """
+    Try to fetch a brief description of the company from their own website.
+    Returns a clean text snippet (≤1 000 chars) or empty string on failure.
+    """
+    import requests as _req
+
+    if not job_url:
+        return ""
+
+    # Extract domain from job URL
+    m = re.search(r"https?://(?:www\.)?([^/]+)", job_url)
+    if not m:
+        return ""
+    domain = m.group(1).lower()
+
+    # Skip job board domains — they don't tell us about the company
+    if any(board in domain for board in _JOB_BOARD_DOMAINS):
+        return ""
+
+    headers = {"User-Agent": "Mozilla/5.0 (compatible; job-search-bot/1.0)"}
+
+    for url in [f"https://{domain}/about", f"https://www.{domain}/about", f"https://{domain}"]:
+        try:
+            resp = _req.get(url, timeout=6, headers=headers, allow_redirects=True)
+            if resp.status_code != 200:
+                continue
+            # Strip tags and collapse whitespace
+            text = re.sub(r"<[^>]+>", " ", resp.text)
+            text = re.sub(r"\s+", " ", text).strip()
+            if len(text) > 150:
+                return text[:1000]
+        except Exception:
+            continue
+
+    return ""
+
+
 def tailor_job(job: dict, resume_text: Optional[str] = None) -> TailorResult:
     if resume_text is None:
         resume_text = _load_resume()
@@ -127,6 +218,7 @@ def tailor_job(job: dict, resume_text: Optional[str] = None) -> TailorResult:
     title       = job.get("title", "")
     company     = job.get("company", "")
     description = job.get("description", "") or ""
+    job_url     = job.get("url", "") or ""
 
     if not description.strip():
         raise ValueError(f"Job {job.get('id')} has no description — cannot tailor. Fetch the description first.")
@@ -140,6 +232,26 @@ def tailor_job(job: dict, resume_text: Optional[str] = None) -> TailorResult:
     else:
         company_line = f"Company: {company}"
 
+    # Fetch company context from their own website (best-effort, silent on failure)
+    print(f"[Tailor] Fetching company context from {job_url or 'N/A'}…")
+    company_context = _fetch_company_context(job_url)
+    if company_context:
+        print(f"[Tailor] Got {len(company_context)} chars of company context.")
+    else:
+        print("[Tailor] No company context found — proceeding with job description only.")
+
+    company_context_block = (
+        f"\n## Company Context (from their website)\n{company_context}\n"
+        if company_context else ""
+    )
+
+    # Build system prompt from profile
+    import sys as _sys
+    _sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+    from storage.profile import load_profile as _load_profile
+    profile = _load_profile()
+    system_prompt = _build_system_prompt(profile)
+
     client = anthropic.Anthropic()
 
     user_msg = textwrap.dedent(f"""
@@ -151,13 +263,14 @@ def tailor_job(job: dict, resume_text: Optional[str] = None) -> TailorResult:
         {company_line}
 
         {description[:4000]}
+        {company_context_block}
     """).strip()
 
     print(f"[Tailor] Calling Claude {MODEL} for: {title} @ {company}…")
     message = client.messages.create(
         model=MODEL,
         max_tokens=4096,
-        system=TAILOR_SYSTEM,
+        system=system_prompt,
         messages=[{"role": "user", "content": user_msg}],
     )
 
@@ -179,6 +292,10 @@ def tailor_job(job: dict, resume_text: Optional[str] = None) -> TailorResult:
     # Use Claude's identified real company — never an aggregator name
     real_company    = data.get("real_company", "").strip() or company
 
+    # Strip em dashes — an immediate AI tell. Replace with a plain hyphen-minus.
+    tailored_resume = tailored_resume.replace("\u2014", "-").replace("\u2013", "-")
+    cover_letter    = cover_letter.replace("\u2014", "-").replace("\u2013", "-")
+
     slug    = _slug(title, real_company)
     out_dir = os.path.join(OUTPUT_DIR, slug)
     os.makedirs(out_dir, exist_ok=True)
@@ -188,6 +305,7 @@ def tailor_job(job: dict, resume_text: Optional[str] = None) -> TailorResult:
 
     _write_resume_docx(tailored_resume, resume_path)
     _write_cover_letter_docx(cover_letter, title, real_company, cl_path)
+    _ats_validate(resume_path)
 
     if real_company != company:
         print(f"[Tailor] Real company identified: {real_company} (was: {company})")
@@ -239,6 +357,46 @@ def _add_hrule(doc):
     bottom.set(qn("w:color"), "1d4ed8")   # same blue as ACCENT
     pBdr.append(bottom)
     pPr.append(pBdr)
+
+
+def _ats_validate(path: str):
+    """
+    Post-process the resume .docx for ATS compatibility:
+    - Warn on any tables (ATS parsers often skip table content)
+    - Ensure all paragraphs are left-aligned (centred name is fine, rest must be left)
+    - Ensure no text boxes (not generated by our writer, but defensive check)
+    Prints a summary — does not modify the file if it already passes.
+    """
+    doc = Document(path)
+    issues = []
+
+    if doc.tables:
+        issues.append(f"{len(doc.tables)} table(s) found — ATS may skip table content")
+
+    # Check for text boxes in the XML
+    from docx.oxml.ns import qn as _qn
+    body_xml = doc.element.body.xml
+    if "w:txbx" in body_xml:
+        issues.append("Text box(es) detected — ATS parsers cannot read text boxes")
+
+    # Check paragraph alignment — only the name (first non-empty para) may be centred
+    first_content = True
+    for para in doc.paragraphs:
+        if not para.text.strip():
+            continue
+        if first_content:
+            first_content = False
+            continue  # name line — any alignment ok
+        if para.alignment and para.alignment.name == "CENTER":
+            issues.append(f"Centred paragraph found: \"{para.text[:40]}\" — left-align for ATS")
+            break  # one warning is enough
+
+    if issues:
+        print("[ATS] ⚠️  Potential ATS issues detected:")
+        for issue in issues:
+            print(f"       • {issue}")
+    else:
+        print("[ATS] ✅ Resume passes basic ATS formatting checks.")
 
 
 def _write_resume_docx(text: str, path: str):

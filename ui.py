@@ -1,3 +1,5 @@
+# Copyright (c) 2026 Adem Garic. All rights reserved.
+# Unauthorized use, copying, or distribution is prohibited. See LICENSE.
 """
 Job Search Automator — Streamlit UI
 
@@ -21,7 +23,9 @@ sys.path.insert(0, os.path.dirname(__file__))
 from storage.database import (
     get_all_jobs, get_job_by_id, update_status, save_score,
     get_unscored_jobs, get_jobs_without_description, stats, get_applied_jobs,
+    delete_job,
 )
+from storage.profile import load_profile, save_profile
 
 # ── page config ──────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -50,7 +54,7 @@ STATUS_COLOR = {
 
 VALID_STATUSES = ["new", "applied", "interviewing", "offer", "rejected"]
 # LinkedIn + Indeed first — best location-aware sources
-SOURCES = ["linkedin", "indeed", "remoteok", "weworkremotely", "dice", "greenhouse", "lever"]
+SOURCES = ["linkedin", "indeed", "remoteok", "weworkremotely", "dice", "greenhouse", "lever", "himalayas", "jobspresso"]
 ERIE_SOURCES = ["linkedin", "indeed"]   # only these support geographic location well
 
 
@@ -101,7 +105,7 @@ with st.sidebar:
 
     page = st.radio(
         "Navigate",
-        ["📋 Job Board", "📊 Dashboard", "🔧 Actions", "📁 My Applications"],
+        ["👤 Profile", "🔧 Actions", "📋 Job Board", "📊 Dashboard", "📁 My Applications"],
         label_visibility="collapsed",
     )
 
@@ -121,6 +125,17 @@ with st.sidebar:
     t3.metric("Offer", _ap.get("offer", 0))
     if _ap.get("applied", 0) + _ap.get("interviewing", 0) + _ap.get("offer", 0) > 0:
         st.caption("✅ Preserved on fresh search")
+
+
+# ── profile completeness check ────────────────────────────────────────────────
+_profile = load_profile()
+_profile_complete = bool(_profile.get("name") and _profile.get("resume"))
+if not _profile_complete and page != "👤 Profile":
+    st.warning(
+        "**Complete your profile first.** "
+        "Go to **👤 Profile** in the sidebar to add your name, contact info, and resume. "
+        "Scoring and tailoring won't work without it."
+    )
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -343,6 +358,23 @@ if page == "📋 Job Board":
                         files = st.session_state[state_key]
                         if files.get("log"):
                             st.code(files["log"])
+
+                        # ── ATS check badge ───────────────────────────────
+                        log = files.get("log", "")
+                        if "[ATS] ✅" in log:
+                            st.success("ATS Check: Resume passed")
+                        elif "[ATS] ⚠️" in log:
+                            # Extract issue lines from the log
+                            issues = [
+                                line.strip().lstrip("•").strip()
+                                for line in log.splitlines()
+                                if line.strip().startswith("•")
+                            ]
+                            st.warning(
+                                "ATS Check: Issues found\n"
+                                + ("\n".join(f"• {i}" for i in issues) if issues else "")
+                            )
+
                         dl_col1, dl_col2 = st.columns(2)
                         co = files.get("company", job["company"]).replace(" ", "_")
                         if files.get("resume") and os.path.exists(files["resume"]):
@@ -454,32 +486,54 @@ elif page == "🔧 Actions":
     st.title("🔧 Actions")
     st.caption("Run scraping, scoring, and fetching operations directly from the UI.")
 
+    # ── post-scrape result banner (persists after rerun) ──────────────────────
+    if "last_scrape_count" in st.session_state:
+        count = st.session_state["last_scrape_count"]
+        st.success(
+            f"Done! Found **{count} new job(s)** in the database. "
+            f"Go to **📋 Job Board** to review and start applying."
+        )
+        if st.button("Dismiss", key="dismiss_scrape_banner"):
+            del st.session_state["last_scrape_count"]
+            st.rerun()
+
     # ── scrape ────────────────────────────────────────────────────────────────
     with st.expander("🕷️ Scrape Jobs", expanded=True):
         st.markdown("Search job boards and pull new listings into the database.")
 
         s_col1, s_col2 = st.columns(2)
         with s_col1:
+            _default_kw = load_profile().get("target_role", "") or "QA engineer SDET test automation"
+            if "scrape_keywords" not in st.session_state:
+                st.session_state["scrape_keywords"] = _default_kw
             keywords_input = st.text_input(
                 "Keywords",
-                value="QA engineer SDET quality assurance test automation",
-                help="Space-separated keywords",
+                key="scrape_keywords",
+                help="Space-separated keywords — set your default in the Profile page.",
             )
             location_mode = st.radio(
                 "Location mode",
-                ["🌐 Remote only", "📍 Erie PA (local / hybrid)", "🔀 Both"],
+                ["🇺🇸 US Remote only", "🌐 World Remote", "📍 Local / Hybrid", "🔀 Both (US Remote + Local)"],
                 index=0,
                 help=(
-                    "Remote: searches all selected sources for remote jobs.\n"
-                    "Erie PA: searches LinkedIn + Indeed for on-site / hybrid roles near Erie, PA.\n"
-                    "Both: does both passes in sequence."
+                    "US Remote: remote jobs limited to United States.\n"
+                    "World Remote: remote jobs worldwide (no country filter).\n"
+                    "Local / Hybrid: LinkedIn + Indeed near your specified location.\n"
+                    "Both: US Remote + local in sequence."
                 ),
             )
+            local_location = ""
+            if location_mode in ("📍 Local / Hybrid", "🔀 Both (US Remote + Local)"):
+                local_location = st.text_input(
+                    "Location (city, state or zip code)",
+                    value="Erie, PA",
+                    placeholder="e.g. Pittsburgh, PA  or  16509",
+                )
         with s_col2:
             sources_input = st.multiselect(
                 "Sources  (LinkedIn & Indeed first)",
                 SOURCES,
-                default=["linkedin", "indeed", "remoteok", "weworkremotely", "greenhouse", "lever"],
+                default=["linkedin", "indeed", "remoteok", "weworkremotely", "greenhouse", "lever", "himalayas", "jobspresso"],
             )
             max_results = st.slider("Max results per source", 10, 100, 50, step=10)
             freshness = st.select_slider(
@@ -516,36 +570,44 @@ elif page == "🔧 Actions":
                 days_args = ["--days-ago", str(days_ago)] if days_ago else []
 
                 # ── remote pass ───────────────────────────────────────────
-                if location_mode in ("🌐 Remote only", "🔀 Both"):
-                    with st.spinner("Scraping remote jobs…"):
+                if location_mode in ("🇺🇸 US Remote only", "🌐 World Remote", "🔀 Both (US Remote + Local)"):
+                    remote_location = "Remote US" if location_mode in ("🇺🇸 US Remote only", "🔀 Both (US Remote + Local)") else "Remote"
+                    label = "US remote" if remote_location == "Remote US" else "worldwide remote"
+                    with st.spinner(f"Scraping {label} jobs…"):
                         out = run_cli(
                             ["main.py", "scrape"]
                             + kw_args
-                            + ["--location", "Remote"]
+                            + ["--location", remote_location]
                             + src_args_remote
                             + max_args
                             + days_args
                         )
-                    output_lines.append("── Remote pass ──\n" + out)
+                    output_lines.append(f"── Remote pass ({label}) ──\n" + out)
 
-                # ── Erie PA pass ──────────────────────────────────────────
-                if location_mode in ("📍 Erie PA (local / hybrid)", "🔀 Both"):
-                    erie_sources = [s for s in ERIE_SOURCES if s in sources_input]
-                    if erie_sources:
-                        with st.spinner("Scraping Erie PA local / hybrid jobs (LinkedIn + Indeed)…"):
+                # ── Local / hybrid pass ───────────────────────────────────
+                if location_mode in ("📍 Local / Hybrid", "🔀 Both (US Remote + Local)"):
+                    local_sources = [s for s in ERIE_SOURCES if s in sources_input]
+                    if not local_location.strip():
+                        output_lines.append("⚠️ Local pass skipped — enter a location above.")
+                    elif local_sources:
+                        with st.spinner(f"Scraping local / hybrid jobs near {local_location}…"):
                             out = run_cli(
                                 ["main.py", "scrape"]
                                 + kw_args
-                                + ["--location", "Erie, PA"]
-                                + src_args_erie
+                                + ["--location", local_location.strip()]
+                                + ["--sources"] + local_sources
                                 + max_args
                                 + days_args
                             )
-                        output_lines.append("── Erie PA pass ──\n" + out)
+                        output_lines.append(f"── Local pass ({local_location.strip()}) ──\n" + out)
                     else:
-                        output_lines.append("⚠️ Erie PA pass skipped — LinkedIn and/or Indeed must be selected.")
+                        output_lines.append("⚠️ Local pass skipped — LinkedIn and/or Indeed must be selected.")
 
                 st.code("\n\n".join(output_lines))
+
+                # ── post-scrape summary — store in state so it survives reruns ──
+                new_jobs = get_all_jobs(status="new")
+                st.session_state["last_scrape_count"] = len(new_jobs)
                 st.rerun()
 
     # ── fetch descriptions ────────────────────────────────────────────────────
@@ -606,12 +668,19 @@ elif page == "📁 My Applications":
     st.title("📁 My Applications")
     st.caption("Your application history — preserved across fresh searches.")
 
-    PIPELINE = ["applied", "interviewing", "offer", "rejected"]
+    PIPELINE = ["applied", "interviewing", "offer"]
     PIPELINE_COLOR = {
         "applied":      "#3b82f6",
         "interviewing": "#a855f7",
         "offer":        "#22c55e",
-        "rejected":     "#ef4444",
+    }
+    NEXT_STAGE = {
+        "applied":      "interviewing",
+        "interviewing": "offer",
+    }
+    NEXT_LABEL = {
+        "applied":      "→ Interviewing",
+        "interviewing": "→ Offer",
     }
 
     # ── filters ───────────────────────────────────────────────────────────────
@@ -623,7 +692,7 @@ elif page == "📁 My Applications":
     with f3:
         app_sort = st.radio("Sort by", ["Date applied ↓", "Score ↓"], horizontal=True, key="app_sort")
 
-    # Load — only in-progress / completed applications
+    # Load — only active pipeline applications (no rejected — those are deleted)
     app_jobs = get_all_jobs(
         status=None if app_status == "All" else app_status,
         keyword=app_keyword or None,
@@ -636,11 +705,10 @@ elif page == "📁 My Applications":
     # ── pipeline summary bar ──────────────────────────────────────────────────
     db_stats = stats()
     _ap = db_stats["by_status"]
-    m1, m2, m3, m4 = st.columns(4)
+    m1, m2, m3 = st.columns(3)
     m1.metric("Applied",      _ap.get("applied", 0))
     m2.metric("Interviewing", _ap.get("interviewing", 0))
     m3.metric("Offer",        _ap.get("offer", 0))
-    m4.metric("Rejected",     _ap.get("rejected", 0))
     st.divider()
 
     if not app_jobs:
@@ -660,7 +728,7 @@ elif page == "📁 My Applications":
             st.markdown(
                 f"""
                 <div style="border-left: 4px solid {st_color}; padding: 12px 16px;
-                            background: #1e293b; border-radius: 6px; margin-bottom: 8px;">
+                            background: #1e293b; border-radius: 6px; margin-bottom: 4px;">
                     <div style="display:flex; justify-content:space-between; align-items:center;">
                         <div>
                             <span style="font-size:1.05rem; font-weight:600; color:#f1f5f9;">
@@ -689,6 +757,25 @@ elif page == "📁 My Applications":
                 unsafe_allow_html=True,
             )
 
+            # ── inline action buttons ─────────────────────────────────────────
+            btn_cols = st.columns([1, 1, 1, 4])
+            next_stage = NEXT_STAGE.get(job["status"])
+            if next_stage:
+                if btn_cols[0].button(
+                    NEXT_LABEL[job["status"]],
+                    key=f"advance_{job['id']}",
+                    use_container_width=True,
+                ):
+                    update_status(job["id"], next_stage)
+                    st.rerun()
+            if btn_cols[1].button(
+                "🗑 Remove",
+                key=f"delete_{job['id']}",
+                use_container_width=True,
+            ):
+                delete_job(job["id"])
+                st.rerun()
+
             with st.expander(f"Details — ID {job['id']}", expanded=False):
                 d1, d2 = st.columns([2, 1])
                 with d1:
@@ -704,17 +791,16 @@ elif page == "📁 My Applications":
                         st.link_button("🔗 Open Job", job["url"])
 
                     st.divider()
-                    # Stage updater
-                    new_status = st.selectbox(
-                        "Update stage",
+                    # Stage corrector — lets you fix mistakes / go back
+                    correct_stage = st.selectbox(
+                        "Correct stage",
                         PIPELINE,
                         index=PIPELINE.index(job["status"]) if job["status"] in PIPELINE else 0,
-                        key=f"appstatus_{job['id']}",
+                        key=f"correct_{job['id']}",
                     )
-                    if new_status != job["status"]:
-                        if st.button("Save", key=f"appsave_{job['id']}"):
-                            update_status(job["id"], new_status)
-                            st.success(f"Stage updated to **{new_status}**")
+                    if correct_stage != job["status"]:
+                        if st.button("Save", key=f"correctsave_{job['id']}"):
+                            update_status(job["id"], correct_stage)
                             st.rerun()
 
                     # Notes field stored in session state (lightweight, no DB change needed)
@@ -725,3 +811,59 @@ elif page == "📁 My Applications":
                         height=100,
                         placeholder="e.g. Phone screen with Sarah on Apr 10, asked about Appium experience…",
                     )
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# PAGE: PROFILE
+# ════════════════════════════════════════════════════════════════════════════
+elif page == "👤 Profile":
+    st.title("👤 Profile")
+    st.caption("Your info is used for resume tailoring and cover letter generation.")
+
+    profile = load_profile()
+
+    st.subheader("Contact Info")
+    c1, c2 = st.columns(2)
+    with c1:
+        p_name        = st.text_input("Full name",    value=profile.get("name", ""))
+        p_email       = st.text_input("Email",         value=profile.get("email", ""))
+        p_location    = st.text_input("Location",     value=profile.get("location", ""),
+                                      placeholder="e.g. Erie, PA")
+        p_target_role = st.text_input(
+            "Target role / keywords",
+            value=profile.get("target_role", ""),
+            placeholder="e.g. SDET test automation Appium",
+            help="Used as the default search keywords when scraping jobs.",
+        )
+    with c2:
+        p_linkedin = st.text_input("LinkedIn URL", value=profile.get("linkedin", ""),
+                                   placeholder="linkedin.com/in/your-handle")
+        p_github   = st.text_input("GitHub URL",   value=profile.get("github", ""),
+                                   placeholder="github.com/yourhandle")
+        p_website  = st.text_input("Website / Portfolio", value=profile.get("website", ""),
+                                   placeholder="yourportfolio.com (optional)")
+
+    st.divider()
+    st.subheader("Resume")
+    st.caption("Paste your full resume as plain text. This is what Claude uses for tailoring.")
+    p_resume = st.text_area(
+        "Resume text",
+        value=profile.get("resume", ""),
+        height=500,
+        label_visibility="collapsed",
+        placeholder="Paste your resume here…",
+    )
+
+    st.divider()
+    if st.button("💾 Save Profile", type="primary"):
+        save_profile({
+            "name":        p_name.strip(),
+            "email":       p_email.strip(),
+            "linkedin":    p_linkedin.strip(),
+            "github":      p_github.strip(),
+            "website":     p_website.strip(),
+            "location":    p_location.strip(),
+            "target_role": p_target_role.strip(),
+            "resume":      p_resume.strip(),
+        })
+        st.toast("Profile saved!", icon="✅")

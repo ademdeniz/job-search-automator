@@ -11,9 +11,13 @@ __pycache__/
 venv/
 env/
 
+# Profile — contains personal resume and contact info
+profile.json
+
 # Generated exports
 *.csv
 
 # OS
 .DS_Store
 output/
+.claude/
