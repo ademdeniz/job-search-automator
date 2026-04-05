@@ -80,17 +80,21 @@ _TAILOR_SYSTEM_TEMPLATE = textwrap.dedent("""
     - {github_instruction}
 
     COVER LETTER rules:
-    - NO "Dear Hiring Manager" opener on its own line — weave it into the first sentence naturally OR skip it.
-    - Opening paragraph: lead with a strong hook that mentions the company BY NAME and what specifically
-      draws the candidate to them (use the Company Context if provided — reference their product, mission,
-      or tech stack specifically). Do NOT use generic phrases like "I am excited to apply".
-    - Middle 1-2 paragraphs: 2-3 concrete achievements pulled DIRECTLY from the resume with exact metrics
-      and project names — make it sound like the candidate, not a template.
-    - Closing paragraph: confident, specific call to action referencing the role by name.
-    - Tone: direct and confident, not stiff or generic. No filler phrases.
+    - Exactly 3 paragraphs plus a sign-off. No more.
+    - NO "Dear Hiring Manager" opener on its own line — skip it entirely.
+    - Paragraph 1 (2-3 sentences MAX): Name the company and the role. State one specific reason this
+      role fits — tied to their product, mission, or tech stack (use Company Context if available).
+      End with one sharp sentence on your single most relevant qualification. No "I am excited to apply".
+    - Paragraph 2 (3-4 sentences): One concrete story — your biggest relevant achievement with exact
+      metrics and project names from the resume. Impact first, then what you did. Do not list multiple
+      achievements; go deep on one.
+    - Paragraph 3 (2-3 sentences): Two or three specific skills or qualifications that map directly
+      to the job's stated requirements. Name the technology or method, not generic traits.
+      End with a single confident call to action referencing the role by name.
+    - Sign-off: "Best regards,\\n\\n{name}\\n{email}{linkedin_line}"
+    - Tone: direct, confident, specific. No filler phrases ("I believe", "I feel", "passionate about").
+    - No defensive language ("not just", "not only").
     - NEVER use em dashes (—). Use a comma, period, or rewrite the sentence instead.
-    - End with: "Best regards,\\n\\n{name}\\n{email}{linkedin_line}"
-    - Length: 3-4 paragraphs total.
 
     GLOBAL FORMATTING RULE: Never use em dashes (—) anywhere in either document.
     They are an immediate AI tell. Rewrite any sentence that would need one.
@@ -503,6 +507,17 @@ def _write_resume_docx(text: str, path: str):
 
 
 def _write_cover_letter_docx(text: str, title: str, company: str, path: str):
+    import sys as _sys
+    _sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+    from storage.profile import load_profile as _load_profile
+    _profile = _load_profile()
+    _name    = _profile.get("name", "")
+    _email   = _profile.get("email", "")
+    _linkedin = _profile.get("linkedin", "").strip().rstrip("/")
+    _github   = _profile.get("github", "").strip().rstrip("/")
+    _contact_parts = [p for p in [_email, _linkedin, _github] if p]
+    _contact_line  = "  ·  ".join(_contact_parts)
+
     doc = Document()
 
     for sec in doc.sections:
@@ -517,13 +532,11 @@ def _write_cover_letter_docx(text: str, title: str, company: str, path: str):
 
     # ── Letterhead ────────────────────────────────────────────────────────────
     p_name = doc.add_paragraph()
-    r = p_name.add_run("Adem Garic")
+    r = p_name.add_run(_name)
     _font(r, size=16, bold=True, color=DARK)
 
     p_contact = doc.add_paragraph()
-    r2 = p_contact.add_run(
-        "ademdenizgaric@gmail.com  ·  linkedin.com/in/adem-garic-sdet-qa  ·  github.com/ademdeniz"
-    )
+    r2 = p_contact.add_run(_contact_line)
     _font(r2, size=9, color=MUTED)
     _para_fmt(p_contact, space_after=4)
 
