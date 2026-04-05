@@ -259,7 +259,7 @@ if page == "📋 Job Board":
                     st.divider()
 
                     # ── Tailor resume + cover letter ──────────────────────
-                    has_desc = bool(job.get("description"))
+                    has_desc = len(job.get("description") or "") >= 30
                     manual_key = f"manual_desc_{job['id']}"
 
                     # Detect aggregators — show company override field

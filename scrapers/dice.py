@@ -140,10 +140,16 @@ def _parse_from_link(page, link, href: str) -> Job:
         # line 4: "•"
         # line 5: "Today" / "X days ago"
         # line 6+: Description snippet
+        import re as _re
         SKIP = {"easy apply", "•", "today", "new", "promoted"}
 
         lines = [l.strip() for l in card_text.strip().splitlines() if l.strip()]
-        meaningful = [l for l in lines if l.lower() not in SKIP and not l.lower().startswith("days ago")]
+        meaningful = [
+            l for l in lines
+            if l.lower() not in SKIP
+            and not _re.match(r'^\d+[dh] ago$', l.lower())
+            and not l.lower().startswith("days ago")
+        ]
 
         company  = meaningful[0] if len(meaningful) > 0 else ""
         title    = meaningful[1] if len(meaningful) > 1 else ""
