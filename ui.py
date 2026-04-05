@@ -54,7 +54,7 @@ STATUS_COLOR = {
 
 VALID_STATUSES = ["new", "applied", "interviewing", "offer", "rejected"]
 # LinkedIn + Indeed first — best location-aware sources
-SOURCES = ["linkedin", "indeed", "remoteok", "weworkremotely", "dice", "greenhouse", "lever"]
+SOURCES = ["linkedin", "indeed", "remoteok", "weworkremotely", "dice", "greenhouse", "lever", "himalayas", "jobspresso"]
 ERIE_SOURCES = ["linkedin", "indeed"]   # only these support geographic location well
 
 
@@ -505,7 +505,7 @@ elif page == "🔧 Actions":
             sources_input = st.multiselect(
                 "Sources  (LinkedIn & Indeed first)",
                 SOURCES,
-                default=["linkedin", "indeed", "remoteok", "weworkremotely", "greenhouse", "lever"],
+                default=["linkedin", "indeed", "remoteok", "weworkremotely", "greenhouse", "lever", "himalayas", "jobspresso"],
             )
             max_results = st.slider("Max results per source", 10, 100, 50, step=10)
             freshness = st.select_slider(
