@@ -1,3 +1,5 @@
+# Copyright (c) 2026 Adem Garic. All rights reserved.
+# Unauthorized use, copying, or distribution is prohibited. See LICENSE.
 import time
 import requests
 from datetime import datetime, timezone
@@ -24,21 +26,14 @@ class RemoteOKScraper(BaseScraper):
         # First element is metadata, skip it
         postings = [p for p in data if isinstance(p, dict) and "id" in p]
 
-        query_terms = [kw.lower() for kw in self.keywords]
         jobs: List[Job] = []
 
         for post in postings:
             if len(jobs) >= self.max_results:
                 break
 
-            # Match against tags, position, and description
-            searchable = " ".join([
-                post.get("position", ""),
-                post.get("description", ""),
-                " ".join(post.get("tags", [])),
-            ]).lower()
-
-            if not any(term in searchable for term in query_terms):
+            title = post.get("position", "")
+            if not self._title_matches_keywords(title):
                 continue
 
             # Location filter (RemoteOK is remote-only, but check if user wants specific region)
