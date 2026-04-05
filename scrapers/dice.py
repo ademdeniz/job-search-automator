@@ -86,8 +86,15 @@ class DiceScraper(BaseScraper):
                     seen_urls.add(href)
 
                     job = _parse_from_link(page, link, href)
-                    if job and self._title_matches_keywords(job.title):
-                        jobs.append(job)
+                    if not job or not self._title_matches_keywords(job.title):
+                        continue
+                    # Drop non-remote jobs when user requested remote
+                    wants_remote = self.location.lower().strip() in (
+                        "remote", "remote us", "us remote", "anywhere", "",
+                    )
+                    if wants_remote and not job.remote:
+                        continue
+                    jobs.append(job)
 
                 # Next page button
                 try:
