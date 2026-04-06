@@ -324,8 +324,49 @@ def tailor_job(job: dict, resume_text: Optional[str] = None) -> TailorResult:
 
     tailored_resume = data.get("tailored_resume", "").strip()
     cover_letter    = data.get("cover_letter", "").strip()
-    # Use Claude's identified real company — never an aggregator name
     real_company    = data.get("real_company", "").strip() or company
+
+    # ── Voice pass: rewrite cover letter to match the candidate's natural writing style ──
+    writing_sample = profile.get("writing_sample", "").strip()
+    if writing_sample and cover_letter:
+        print("[Tailor] Running voice pass to match candidate's natural writing style…")
+        voice_msg = textwrap.dedent(f"""
+            Here is a cover letter draft:
+
+            ---
+            {cover_letter}
+            ---
+
+            Here is how this person actually writes when they're not trying to impress anyone:
+
+            ---
+            {writing_sample[:1500]}
+            ---
+
+            Rewrite the cover letter so it sounds like the same person who wrote that sample.
+            Keep every fact, metric, and company name exactly as they are — do not add or remove information.
+            Change the voice: sentence rhythm, word choice, level of formality.
+
+            Specific things to fix:
+            - Replace any phrase that sounds like a job application cliché ("full-cycle ownership",
+              "I'd bring", "that kind of work", "the ramp-up is short", "I welcome the chance").
+            - Match the sample's sentence length variation — mix short statements with longer ones.
+            - Use contractions where the sample does.
+            - If the sample is dry and observational, the cover letter should be too.
+            - Do not add new buzzwords. Do not make it more formal. Do not make it longer.
+            - Keep exactly 3 paragraphs plus sign-off.
+            - NEVER use em dashes.
+
+            Return only the rewritten cover letter text. No explanation, no JSON.
+        """).strip()
+
+        voice_response = client.messages.create(
+            model=MODEL,
+            max_tokens=1024,
+            messages=[{"role": "user", "content": voice_msg}],
+        )
+        cover_letter = voice_response.content[0].text.strip()
+        print("[Tailor] Voice pass complete.")
 
     # Strip em dashes — an immediate AI tell. Replace with a plain hyphen-minus.
     tailored_resume = tailored_resume.replace("\u2014", "-").replace("\u2013", "-")
