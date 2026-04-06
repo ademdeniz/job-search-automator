@@ -84,16 +84,27 @@ _TAILOR_SYSTEM_TEMPLATE = textwrap.dedent("""
     - NO "Dear Hiring Manager" opener on its own line — skip it entirely.
     - Paragraph 1 (2-3 sentences MAX): Name the company and the role. State one specific reason this
       role fits — tied to their product, mission, or tech stack (use Company Context if available).
-      End with one sharp sentence on your single most relevant qualification. No "I am excited to apply".
-    - Paragraph 2 (3-4 sentences): One concrete story — your biggest relevant achievement with exact
-      metrics and project names from the resume. Impact first, then what you did. Do not list multiple
-      achievements; go deep on one.
+      End with one sharp sentence on the candidate's single most relevant qualification.
+    - Paragraph 2 (3-4 sentences): One concrete story — the candidate's biggest relevant achievement
+      with exact metrics and project names from the resume. Impact first, then what they did. Do not
+      list multiple achievements; go deep on one.
     - Paragraph 3 (2-3 sentences): Two or three specific skills or qualifications that map directly
-      to the job's stated requirements. Name the technology or method, not generic traits.
-      End with a single confident call to action referencing the role by name.
+      to the job's stated requirements. Name the technology or method. End with a confident call to
+      action referencing the role by name.
     - Sign-off: "Best regards,\\n\\n{name}\\n{email}{linkedin_line}"
-    - Tone: direct, confident, specific. No filler phrases ("I believe", "I feel", "passionate about").
-    - No defensive language ("not just", "not only").
+
+    HUMAN-SOUNDING TONE — this is critical:
+    - Use contractions naturally: "I've", "I'm", "it's", "that's", "I'd", "there's".
+    - Vary sentence length intentionally. Mix short punchy sentences with longer ones.
+      A short sentence after a long one creates rhythm. Do not make every sentence the same length.
+    - Never start two consecutive sentences with "I".
+    - Do not use parallel list structures ("X, Y, and Z") — they are an instant AI tell.
+      Instead, describe one thing specifically or connect ideas with "and" naturally.
+    - Ban these words and phrases entirely: "high-impact", "results-first", "passionate",
+      "excited to apply", "I believe", "I feel", "dedicated", "leverage", "utilize",
+      "align", "directly reducing", "increase confidence", "built for", "designed to".
+    - Do not write in perfectly balanced sentences. Real humans leave ideas slightly open.
+    - Write as if the candidate is speaking to someone they respect, not performing for a committee.
     - NEVER use em dashes (—). Use a comma, period, or rewrite the sentence instead.
 
     GLOBAL FORMATTING RULE: Never use em dashes (—) anywhere in either document.
