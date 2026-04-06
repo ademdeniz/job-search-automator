@@ -838,15 +838,31 @@ elif page == "👤 Profile":
     )
 
     st.divider()
+    st.subheader("Writing Sample")
+    st.caption(
+        "Paste a paragraph or two you actually wrote — a LinkedIn post, an email, a personal essay, "
+        "anything informal. Claude uses this to match your natural voice in cover letters. "
+        "The more unfiltered the better."
+    )
+    p_writing_sample = st.text_area(
+        "Writing sample",
+        value=profile.get("writing_sample", ""),
+        height=200,
+        label_visibility="collapsed",
+        placeholder="Paste something you wrote naturally, not for a job application…",
+    )
+
+    st.divider()
     if st.button("💾 Save Profile", type="primary"):
         save_profile({
-            "name":        p_name.strip(),
-            "email":       p_email.strip(),
-            "linkedin":    p_linkedin.strip(),
-            "github":      p_github.strip(),
-            "website":     p_website.strip(),
-            "location":    p_location.strip(),
-            "target_role": p_target_role.strip(),
-            "resume":      p_resume.strip(),
+            "name":           p_name.strip(),
+            "email":          p_email.strip(),
+            "linkedin":       p_linkedin.strip(),
+            "github":         p_github.strip(),
+            "website":        p_website.strip(),
+            "location":       p_location.strip(),
+            "target_role":    p_target_role.strip(),
+            "resume":         p_resume.strip(),
+            "writing_sample": p_writing_sample.strip(),
         })
         st.toast("Profile saved!", icon="✅")
