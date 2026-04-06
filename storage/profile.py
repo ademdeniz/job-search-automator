@@ -17,6 +17,7 @@ DEFAULT_PROFILE = {
     "github":         "",
     "website":        "",
     "location":       "",
+    "title":          "",
     "target_role":    "",
     "resume":         "",
     "writing_sample": "",
