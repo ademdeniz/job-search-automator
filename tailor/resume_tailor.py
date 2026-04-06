@@ -80,17 +80,25 @@ _TAILOR_SYSTEM_TEMPLATE = textwrap.dedent("""
     - {github_instruction}
 
     COVER LETTER rules:
-    - Exactly 3 paragraphs plus a sign-off. No more.
+    - 3 to 4 paragraphs plus a sign-off. Must fit on one page.
     - NO "Dear Hiring Manager" opener on its own line — skip it entirely.
-    - Paragraph 1 (2-3 sentences MAX): Name the company and the role. State one specific reason this
-      role fits — tied to their product, mission, or tech stack (use Company Context if available).
-      End with one sharp sentence on the candidate's single most relevant qualification.
-    - Paragraph 2 (3-4 sentences): One concrete story — the candidate's biggest relevant achievement
-      with exact metrics and project names from the resume. Impact first, then what they did. Do not
-      list multiple achievements; go deep on one.
-    - Paragraph 3 (2-3 sentences): Two or three specific skills or qualifications that map directly
-      to the job's stated requirements. Name the technology or method. End with a confident call to
-      action referencing the role by name.
+
+    OPENING LINE — this is the most important sentence in the letter:
+    - The very first sentence must be a hook. Not "I am applying for...". Not a summary.
+      It should make the reader stop and want to read the next sentence. Options:
+      * A specific, confident observation about what the company is doing or the problem they face.
+      * A counterintuitive or slightly bold professional statement about the candidate's experience.
+      * An unexpected angle that connects the candidate's story directly to this company's situation.
+      If Company Context is available, use something real and specific from it — show you did your homework.
+      The hook must feel earned and grounded, not just stylistically flashy.
+
+    - Paragraph 1: Hook + genuine interest in THIS company and role. Reference their product,
+      mission, or a specific challenge in the job posting. Not generic. Make it about them.
+    - Paragraph 2: One concrete story — the candidate's most relevant achievement with exact
+      metrics and project names. Go deep on one thing, not a list.
+    - Paragraph 3 (and optional 4): Specific skills and experience mapped to the job's requirements.
+      Name real technologies and methods. Close with a confident, genuine call to action that
+      references the role and company by name.
     - Sign-off: "Best regards,\\n\\n{name}\\n{email}{linkedin_line}"
 
     {writing_sample_block}
@@ -103,9 +111,11 @@ _TAILOR_SYSTEM_TEMPLATE = textwrap.dedent("""
       Instead, describe one thing specifically or connect ideas with "and" naturally.
     - Ban these words and phrases entirely: "high-impact", "results-first", "passionate",
       "excited to apply", "I believe", "I feel", "dedicated", "leverage", "utilize",
-      "align", "directly reducing", "increase confidence", "built for", "designed to".
-    - Do not write in perfectly balanced sentences. Real humans leave ideas slightly open.
-    - Write as if the candidate is speaking to someone they respect, not performing for a committee.
+      "align", "directly reducing", "increase confidence", "built for", "designed to",
+      "full-cycle ownership", "I'd bring", "ramp-up", "I welcome the chance".
+    - Authenticity over polish. The letter should feel like it was written by someone who
+      genuinely wants to work there, not someone performing enthusiasm for a committee.
+    - Write as if the candidate is speaking to someone they respect.
     - NEVER use em dashes (—). Use a comma, period, or rewrite the sentence instead.
 
     GLOBAL FORMATTING RULE: Never use em dashes (—) anywhere in either document.
@@ -344,17 +354,25 @@ def tailor_job(job: dict, resume_text: Optional[str] = None) -> TailorResult:
             ---
 
             Rewrite the cover letter so it sounds like the same person who wrote that sample.
-            Keep every fact, metric, and company name exactly as they are — do not add or remove information.
+            Keep every fact, metric, and company name exactly as they are. Do not add or remove information.
             Change the voice: sentence rhythm, word choice, level of formality.
 
-            Specific things to fix:
+            OPENING LINE — this is the most important fix:
+            The current first sentence is probably too plain or too much like a job application opener.
+            Rewrite it as a hook: something specific, confident, and slightly unexpected that makes the
+            reader want to continue. Ground it in something real about the company or the candidate's work.
+            Not flashy for the sake of it — earned. Provoke a little. Be direct.
+
+            Everything else to fix:
             - Replace any phrase that sounds like a job application cliché ("full-cycle ownership",
-              "I'd bring", "that kind of work", "the ramp-up is short", "I welcome the chance").
+              "I'd bring", "that kind of work", "the ramp-up is short", "I welcome the chance",
+              "I've done that", "no long warm-up periods").
             - Match the sample's sentence length variation — mix short statements with longer ones.
-            - Use contractions where the sample does.
-            - If the sample is dry and observational, the cover letter should be too.
-            - Do not add new buzzwords. Do not make it more formal. Do not make it longer.
-            - Keep exactly 3 paragraphs plus sign-off.
+            - Use contractions the way the sample does.
+            - If the sample is dry and observational, the letter should be too.
+            - Authenticity over polish. It should feel like someone who genuinely wants this job,
+              not someone going through the motions.
+            - Do not add buzzwords. Do not make it more formal. Keep it to one page.
             - NEVER use em dashes.
 
             Return only the rewritten cover letter text. No explanation, no JSON.
