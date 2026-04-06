@@ -93,6 +93,7 @@ _TAILOR_SYSTEM_TEMPLATE = textwrap.dedent("""
       action referencing the role by name.
     - Sign-off: "Best regards,\\n\\n{name}\\n{email}{linkedin_line}"
 
+    {writing_sample_block}
     HUMAN-SOUNDING TONE — this is critical:
     - Use contractions naturally: "I've", "I'm", "it's", "that's", "I'd", "there's".
     - Vary sentence length intentionally. Mix short punchy sentences with longer ones.
@@ -119,6 +120,7 @@ def _build_system_prompt(profile: dict) -> str:
     email    = profile.get("email", "")
     linkedin = profile.get("linkedin", "").strip().rstrip("/")
     github   = profile.get("github", "").strip().rstrip("/")
+    writing_sample = profile.get("writing_sample", "").strip()
 
     contact_parts = [c for c in [email, linkedin] if c]
     linkedin_line = " | " + " | ".join(contact_parts[1:]) if len(contact_parts) > 1 else ""
@@ -128,12 +130,30 @@ def _build_system_prompt(profile: dict) -> str:
         if github else "Include the candidate's GitHub URL in the contact line if available."
     )
 
+    if writing_sample:
+        writing_sample_block = (
+            "VOICE CALIBRATION — the candidate's actual writing (not a job document):\n"
+            "```\n"
+            f"{writing_sample[:1500]}\n"
+            "```\n"
+            "Study this carefully. Mirror the candidate's natural rhythm and sentence patterns:\n"
+            "- If their sentences are short and declarative, keep them short and declarative.\n"
+            "- Match their level of specificity — they name exact places, brands, details.\n"
+            "- They don't over-explain observations. State it and move on.\n"
+            "- Their humor is dry and understated. If something is slightly absurd, they just note it.\n"
+            "- They mix short punchy statements with longer observational ones.\n"
+            "- Do not impose a corporate voice on top of their natural one.\n"
+        )
+    else:
+        writing_sample_block = ""
+
     return (
         _TAILOR_SYSTEM_TEMPLATE
         .replace("{name}", name)
         .replace("{email}", email)
         .replace("{linkedin_line}", linkedin_line)
         .replace("{github_instruction}", github_instruction)
+        .replace("{writing_sample_block}", writing_sample_block)
     )
 
 
