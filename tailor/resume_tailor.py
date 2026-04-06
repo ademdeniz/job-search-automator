@@ -667,22 +667,20 @@ def _write_cover_letter_docx(text: str, title: str, company: str, path: str):
             _font(r_close, size=11, color=DARK)
             _para_fmt(p_close, space_before=16, space_after=2)
 
-            # Name — larger, different feel
+            # Name — script font to simulate a real signature
             p_sig_name = doc.add_paragraph()
             r_sig_name = p_sig_name.add_run(_name)
-            r_sig_name.font.name = "Georgia"
-            r_sig_name.font.size = Pt(13)
-            r_sig_name.bold = True
+            r_sig_name.font.name = "Brush Script MT"
+            r_sig_name.font.size = Pt(22)
             r_sig_name.font.color.rgb = DARK
-            _para_fmt(p_sig_name, space_before=2, space_after=1)
+            _para_fmt(p_sig_name, space_before=4, space_after=1)
 
-            # Professional title — muted, smaller
+            # Professional title — small, muted, Calibri
             if _title:
                 p_sig_title = doc.add_paragraph()
                 r_sig_title = p_sig_title.add_run(_title)
-                r_sig_title.font.name = "Georgia"
+                r_sig_title.font.name = FONT_NAME
                 r_sig_title.font.size = Pt(9)
-                r_sig_title.italic = True
                 r_sig_title.font.color.rgb = MUTED
                 _para_fmt(p_sig_title, space_before=0, space_after=0)
             continue
@@ -705,18 +703,16 @@ def _write_cover_letter_docx(text: str, title: str, company: str, path: str):
 
         p_sig_name = doc.add_paragraph()
         r_sig_name = p_sig_name.add_run(_name)
-        r_sig_name.font.name = "Georgia"
-        r_sig_name.font.size = Pt(13)
-        r_sig_name.bold = True
+        r_sig_name.font.name = "Brush Script MT"
+        r_sig_name.font.size = Pt(22)
         r_sig_name.font.color.rgb = DARK
-        _para_fmt(p_sig_name, space_before=2, space_after=1)
+        _para_fmt(p_sig_name, space_before=4, space_after=1)
 
         if _title:
             p_sig_title = doc.add_paragraph()
             r_sig_title = p_sig_title.add_run(_title)
-            r_sig_title.font.name = "Georgia"
+            r_sig_title.font.name = FONT_NAME
             r_sig_title.font.size = Pt(9)
-            r_sig_title.italic = True
             r_sig_title.font.color.rgb = MUTED
             _para_fmt(p_sig_title, space_before=0, space_after=0)
 
