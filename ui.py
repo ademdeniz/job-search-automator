@@ -812,6 +812,12 @@ elif page == "👤 Profile":
         p_email       = st.text_input("Email",         value=profile.get("email", ""))
         p_location    = st.text_input("Location",     value=profile.get("location", ""),
                                       placeholder="e.g. Erie, PA")
+        p_title = st.text_input(
+            "Professional title",
+            value=profile.get("title", ""),
+            placeholder="e.g. Senior SDET / QA Automation Engineer",
+            help="Appears under your name in the cover letter signature.",
+        )
         p_target_role = st.text_input(
             "Target role / keywords",
             value=profile.get("target_role", ""),
@@ -861,6 +867,7 @@ elif page == "👤 Profile":
             "github":         p_github.strip(),
             "website":        p_website.strip(),
             "location":       p_location.strip(),
+            "title":          p_title.strip(),
             "target_role":    p_target_role.strip(),
             "resume":         p_resume.strip(),
             "writing_sample": p_writing_sample.strip(),

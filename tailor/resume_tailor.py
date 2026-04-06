@@ -99,7 +99,9 @@ _TAILOR_SYSTEM_TEMPLATE = textwrap.dedent("""
     - Paragraph 3 (and optional 4): Specific skills and experience mapped to the job's requirements.
       Name real technologies and methods. Close with a confident, genuine call to action that
       references the role and company by name.
-    - Sign-off: "Best regards,\\n\\n{name}\\n{email}{linkedin_line}"
+    - Sign-off: end the letter with "Looking forward to connecting," on its own line,
+      then a blank line, then just the candidate's name: "{name}"
+      Do NOT repeat email or LinkedIn — those are already in the letterhead.
 
     {writing_sample_block}
     HUMAN-SOUNDING TONE — this is critical:
@@ -600,11 +602,12 @@ def _write_cover_letter_docx(text: str, title: str, company: str, path: str):
     import sys as _sys
     _sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
     from storage.profile import load_profile as _load_profile
-    _profile = _load_profile()
-    _name    = _profile.get("name", "")
-    _email   = _profile.get("email", "")
+    _profile  = _load_profile()
+    _name     = _profile.get("name", "")
+    _email    = _profile.get("email", "")
     _linkedin = _profile.get("linkedin", "").strip().rstrip("/")
     _github   = _profile.get("github", "").strip().rstrip("/")
+    _title    = _profile.get("title", "") or _profile.get("target_role", "")
     _contact_parts = [p for p in [_email, _linkedin, _github] if p]
     _contact_line  = "  ·  ".join(_contact_parts)
 
@@ -645,23 +648,76 @@ def _write_cover_letter_docx(text: str, title: str, company: str, path: str):
     _para_fmt(p_role, space_after=12)
 
     # ── Body paragraphs ───────────────────────────────────────────────────────
+    _SIGNOFF_TRIGGERS = ("looking forward", "best regards", "sincerely", "warm regards")
+    _CONTACT_SIGNALS  = ("@", "linkedin", "github", "http")
+
+    signoff_written = False
     for para in text.split("\n\n"):
         para = para.strip()
         if not para:
             continue
-        # Sign-off block — preserve line breaks
-        if "Best regards" in para or "Adem Garic" in para:
-            for line in para.splitlines():
-                p = doc.add_paragraph()
-                run = p.add_run(line.strip())
-                bold = "Best regards" in line or line.strip() == "Adem Garic"
-                _font(run, size=11, bold=bold, color=DARK)
-                _para_fmt(p, space_before=0, space_after=1)
+
+        # Detect sign-off paragraph — render custom signature block
+        first_line = para.splitlines()[0].lower()
+        if not signoff_written and any(t in first_line for t in _SIGNOFF_TRIGGERS):
+            signoff_written = True
+            # Closing phrase
+            p_close = doc.add_paragraph()
+            r_close = p_close.add_run("Looking forward to connecting,")
+            _font(r_close, size=11, color=DARK)
+            _para_fmt(p_close, space_before=16, space_after=2)
+
+            # Name — larger, different feel
+            p_sig_name = doc.add_paragraph()
+            r_sig_name = p_sig_name.add_run(_name)
+            r_sig_name.font.name = "Georgia"
+            r_sig_name.font.size = Pt(13)
+            r_sig_name.bold = True
+            r_sig_name.font.color.rgb = DARK
+            _para_fmt(p_sig_name, space_before=2, space_after=1)
+
+            # Professional title — muted, smaller
+            if _title:
+                p_sig_title = doc.add_paragraph()
+                r_sig_title = p_sig_title.add_run(_title)
+                r_sig_title.font.name = "Georgia"
+                r_sig_title.font.size = Pt(9)
+                r_sig_title.italic = True
+                r_sig_title.font.color.rgb = MUTED
+                _para_fmt(p_sig_title, space_before=0, space_after=0)
+            continue
+
+        # Skip any contact lines Claude snuck into the body
+        if any(sig in para.lower() for sig in _CONTACT_SIGNALS):
             continue
 
         p = doc.add_paragraph()
         run = p.add_run(para)
         _font(run, size=11, color=DARK)
         _para_fmt(p, space_before=0, space_after=10, line_spacing=14)
+
+    # Fallback if Claude didn't write a sign-off
+    if not signoff_written:
+        p_close = doc.add_paragraph()
+        r_close = p_close.add_run("Looking forward to connecting,")
+        _font(r_close, size=11, color=DARK)
+        _para_fmt(p_close, space_before=16, space_after=2)
+
+        p_sig_name = doc.add_paragraph()
+        r_sig_name = p_sig_name.add_run(_name)
+        r_sig_name.font.name = "Georgia"
+        r_sig_name.font.size = Pt(13)
+        r_sig_name.bold = True
+        r_sig_name.font.color.rgb = DARK
+        _para_fmt(p_sig_name, space_before=2, space_after=1)
+
+        if _title:
+            p_sig_title = doc.add_paragraph()
+            r_sig_title = p_sig_title.add_run(_title)
+            r_sig_title.font.name = "Georgia"
+            r_sig_title.font.size = Pt(9)
+            r_sig_title.italic = True
+            r_sig_title.font.color.rgb = MUTED
+            _para_fmt(p_sig_title, space_before=0, space_after=0)
 
     doc.save(path)
