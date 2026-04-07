@@ -546,7 +546,10 @@ elif page == "🔧 Actions":
                         out = run_cli(["main.py", "clear"])
                     output_lines.append(out)
 
-                kw_args = ["--keywords"] + keywords_input.split()
+                # Strip separators (|, &, commas) so "SDET | QA | Appium" → ["SDET", "QA", "Appium"]
+                import re as _re
+                _kw_tokens = [t for t in _re.split(r"[\s|&,]+", keywords_input) if t.strip()]
+                kw_args = ["--keywords"] + _kw_tokens
                 src_args_remote = ["--sources"] + sources_input
                 src_args_erie   = ["--sources"] + [s for s in ERIE_SOURCES if s in sources_input]
                 max_args = ["--max-results", str(max_results)]
@@ -616,7 +619,13 @@ elif page == "🔧 Actions":
                 args.append("--all")
             with st.spinner("Scoring with Claude AI… (a few seconds per job)"):
                 out = run_cli(args)
-            st.code(out)
+            st.session_state["last_score_output"] = out
+            st.rerun()
+
+    if "last_score_output" in st.session_state:
+        st.code(st.session_state["last_score_output"])
+        if st.button("Dismiss", key="dismiss_score_output"):
+            del st.session_state["last_score_output"]
             st.rerun()
 
     # ── export ────────────────────────────────────────────────────────────────
