@@ -103,8 +103,7 @@ def score_job(title: str, company: str, description: str,
         if match:
             data = json.loads(match.group())
         else:
-            raise ValueError(f"Could not parse JSON from scorer response:
-{raw_text}")
+            raise ValueError("Could not parse JSON from scorer response:\n" + raw_text)
 
     return ScoreResult(
         score=int(data.get("score", 0)),
