@@ -810,48 +810,31 @@ elif page == "📁 My Applications":
 
     # ── application cards ─────────────────────────────────────────────────────
     for job in app_jobs:
-        score      = job.get("score")
-        level      = match_level(score)
-        s_color    = SCORE_COLOR.get(level, "#94a3b8")
-        st_color   = PIPELINE_COLOR.get(job["status"], "#94a3b8")
-        _chip_type   = f'<span style="color:#64748b; font-size:0.75rem;">🗂 {job["job_type"]}</span>' if job.get("job_type") else ""
-        _chip_salary = f'<span style="color:#64748b; font-size:0.75rem;">💰 {job["salary"]}</span>' if job.get("salary") else ""
+        score    = job.get("score")
+        level    = match_level(score)
+        s_color  = SCORE_COLOR.get(level, "#94a3b8")
+        st_color = PIPELINE_COLOR.get(job["status"], "#94a3b8")
+
+        _chip_s = f'<span style="color:#64748b;font-size:0.75rem;">&#128197; {score_badge(score)}</span>'
+        _chips = "".join([
+            f'<span style="background:{s_color}22;color:{s_color};padding:2px 10px;border-radius:99px;font-size:0.8rem;">{score_badge(score)}</span>',
+            f'<span style="background:{st_color}22;color:{st_color};padding:2px 10px;border-radius:99px;font-size:0.8rem;font-weight:600;">{job["status"]}</span>',
+            f'<span style="color:#64748b;font-size:0.75rem;">&#10003; Applied: {_fmt_date(job.get("applied_at", ""))}</span>',
+            f'<span style="color:#64748b;font-size:0.75rem;">&#128193; {job["job_type"]}</span>' if job.get("job_type") else "",
+            f'<span style="color:#64748b;font-size:0.75rem;">&#128176; {job["salary"]}</span>' if job.get("salary") else "",
+            f'<span style="color:#64748b;font-size:0.8rem;">{job["source"]}</span>',
+        ])
 
         with st.container():
             st.markdown(
-                f"""
-                <div style="border-left: 4px solid {st_color}; padding: 12px 16px;
-                            background: #1e293b; border-radius: 6px; margin-bottom: 4px;">
-                    <div style="display:flex; justify-content:space-between; align-items:center;">
-                        <div>
-                            <span style="font-size:1.05rem; font-weight:600; color:#f1f5f9;">
-                                {job['title']}
-                            </span>
-                            &nbsp;
-                            <span style="color:#94a3b8; font-size:0.9rem;">
-                                {job['company']} · {job['location']}
-                            </span>
-                        </div>
-                        <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-                            <span style="background:{s_color}22; color:{s_color};
-                                         padding:2px 10px; border-radius:99px; font-size:0.8rem;">
-                                {score_badge(score)}
-                            </span>
-                            <span style="background:{st_color}22; color:{st_color};
-                                         padding:2px 10px; border-radius:99px; font-size:0.8rem;
-                                         font-weight:600;">
-                                {job['status']}
-                            </span>
-                            <span style="color:#64748b; font-size:0.75rem;">
-                                ✅ Applied: {_fmt_date(job.get('applied_at', ''))}
-                            </span>
-                            {_chip_type}
-                            {_chip_salary}
-                            <span style="color:#64748b; font-size:0.8rem;">{job['source']}</span>
-                        </div>
-                    </div>
-                </div>
-                """,
+                f"""<div style="border-left:4px solid {st_color};padding:12px 16px;background:#1e293b;border-radius:6px;margin-bottom:4px;">
+<div style="display:flex;justify-content:space-between;align-items:center;">
+<div>
+<span style="font-size:1.05rem;font-weight:600;color:#f1f5f9;">{job['title']}</span>
+&nbsp;<span style="color:#94a3b8;font-size:0.9rem;">{job['company']} · {job['location']}</span>
+</div>
+<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">{_chips}</div>
+</div></div>""",
                 unsafe_allow_html=True,
             )
 
