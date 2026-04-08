@@ -88,12 +88,29 @@ def _extract_metadata(text: str) -> dict:
                 result["posted_date"] = today.strftime("%Y-%m-%d")
 
     # ── Salary ────────────────────────────────────────────────────────────────
-    # "$80,000 - $120,000" or "$45 - $60 per hour" or "$120K"
-    m = re.search(r'\$([\d,]+[kK]?)\s*[-–]\s*\$([\d,]+[kK]?)', text)
-    if m:
-        result["salary"] = f"${m.group(1)} - ${m.group(2)}"
-    else:
-        m = re.search(r'salary[:\s]+\$([\d,]+[kK]?)', text, re.IGNORECASE)
+    # Handles: "$117,300 - $126,500" / "130,000 - 150,000" / "USD $105,000" / "$120K"
+    def _parse_num(s):
+        s = s.replace(",", "")
+        if s.lower().endswith("k"):
+            return int(s[:-1]) * 1000
+        return int(s)
+
+    for pattern in [
+        r'(?:USD\s*)?\$([\d,]+[kK]?)\s*[-–]\s*(?:USD\s*)?\$([\d,]+[kK]?)',
+        r'([\d,]{6,})\s*[-–]\s*([\d,]{6,})',   # bare numbers like "130,000 - 150,000"
+    ]:
+        m = re.search(pattern, text)
+        if m:
+            try:
+                lo, hi = _parse_num(m.group(1)), _parse_num(m.group(2))
+                # Valid salary: both annual (>10k) or both hourly (<500), and hi >= lo
+                if hi >= lo and ((lo > 10000 and hi > 10000) or (lo < 500 and hi < 500)):
+                    result["salary"] = f"${m.group(1)} - ${m.group(2)}"
+                    break
+            except (ValueError, AttributeError):
+                pass
+    if not result.get("salary"):
+        m = re.search(r'(?:salary|compensation)[:\s]+(?:USD\s*)?\$?([\d,]+[kK]?)', text, re.IGNORECASE)
         if m:
             result["salary"] = f"${m.group(1)}"
 
@@ -826,6 +843,8 @@ elif page == "📁 My Applications":
                             <span style="color:#64748b; font-size:0.75rem;">
                                 ✅ Applied: {_fmt_date(job.get('applied_at', ''))}
                             </span>
+                            {f'<span style="color:#64748b; font-size:0.75rem;">🗂 {job["job_type"]}</span>' if job.get('job_type') else ''}
+                            {f'<span style="color:#64748b; font-size:0.75rem;">💰 {job["salary"]}</span>' if job.get('salary') else ''}
                             <span style="color:#64748b; font-size:0.8rem;">{job['source']}</span>
                         </div>
                     </div>
