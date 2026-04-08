@@ -376,6 +376,8 @@ def tailor_job(job: dict, resume_text: Optional[str] = None) -> TailorResult:
               not someone going through the motions.
             - Do not add buzzwords. Do not make it more formal. Keep it to one page.
             - NEVER use em dashes.
+            - Do NOT write the candidate's name as a standalone line before the sign-off.
+              The signature block is handled separately. End the body with the closing phrase only.
 
             Return only the rewritten cover letter text. No explanation, no JSON.
         """).strip()
@@ -655,6 +657,10 @@ def _write_cover_letter_docx(text: str, title: str, company: str, path: str):
     for para in text.split("\n\n"):
         para = para.strip()
         if not para:
+            continue
+
+        # Skip standalone name lines Claude sometimes appends before the sign-off
+        if para.strip() == _name:
             continue
 
         # Detect sign-off paragraph — render custom signature block
