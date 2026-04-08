@@ -123,7 +123,7 @@ class LeverScraper(BaseScraper):
                     location=location or "Unknown",
                     source="lever",
                     url=post.get("hostedUrl", "") or post.get("applyUrl", ""),
-                    description=description[:3000],
+                    description=description[:8000],
                     remote=remote,
                     posted_date=str(post.get("createdAt", "")),
                 ))

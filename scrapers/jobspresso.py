@@ -75,7 +75,7 @@ class JobspressoScraper(BaseScraper):
                 location="Remote",
                 source="jobspresso",
                 url=url,
-                description=description[:3000],
+                description=description[:8000],
                 remote=True,
                 posted_date=pub_date,
             ))

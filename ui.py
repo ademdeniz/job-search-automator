@@ -366,29 +366,30 @@ if page == "📋 Job Board":
                             else:
                                 st.info("No metadata found in description.")
 
+                    # Always show paste area — scraped descriptions are often truncated
+                    paste_label = "Paste full job description (replaces scraped snippet)" if has_desc else "Paste job description"
+                    paste_placeholder = "Copy the full job description from the job board and paste it here…"
                     if not has_desc:
                         st.caption("No description — paste one below to enable tailoring.")
-                        manual_desc = st.text_area(
-                            "Paste job description",
-                            key=manual_key,
-                            height=160,
-                            placeholder="Copy the full job description from the job board and paste it here…",
+                    manual_desc = st.text_area(
+                        paste_label,
+                        key=manual_key,
+                        height=160,
+                        placeholder=paste_placeholder,
+                    )
+                    if manual_desc and st.button("💾 Save description", key=f"save_desc_{job['id']}"):
+                        from storage.database import update_description
+                        update_description(job["id"], manual_desc)
+                        meta = _extract_metadata(manual_desc)
+                        if meta:
+                            update_job_metadata(job["id"], **meta)
+                        st.success(
+                            "Description saved."
+                            + (f" Extracted: {', '.join(f'{k}={v}' for k,v in meta.items())}" if meta else "")
                         )
-                        if manual_desc and st.button("💾 Save description", key=f"save_desc_{job['id']}"):
-                            from storage.database import update_description
-                            update_description(job["id"], manual_desc)
-                            meta = _extract_metadata(manual_desc)
-                            if meta:
-                                update_job_metadata(job["id"], **meta)
-                            st.success(
-                                "Description saved."
-                                + (f" Extracted: {', '.join(f'{k}={v}' for k,v in meta.items())}" if meta else "")
-                            )
-                            st.rerun()
-                    else:
-                        manual_desc = ""
+                        st.rerun()
 
-                    tailor_desc = job.get("description") or st.session_state.get(manual_key, "")
+                    tailor_desc = st.session_state.get(manual_key, "") or job.get("description", "")
                     can_tailor  = bool(tailor_desc.strip())
 
                     if st.button(

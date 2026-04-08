@@ -106,7 +106,7 @@ class GreenhouseScraper(BaseScraper):
                     location=location or "Unknown",
                     source="greenhouse",
                     url=post.get("absolute_url", ""),
-                    description=description[:3000],
+                    description=description[:8000],
                     remote=remote,
                     posted_date=post.get("updated_at", ""),
                 ))
