@@ -782,7 +782,11 @@ elif page == "📁 My Applications":
     with f2:
         app_status = st.selectbox("Stage", ["All"] + PIPELINE, key="app_status")
     with f3:
-        app_sort = st.radio("Sort by", ["Date applied ↓", "Score ↓"], horizontal=True, key="app_sort")
+        app_sort = st.selectbox(
+            "Sort by",
+            ["Date applied ↓", "Date applied ↑", "Score ↓", "Score ↑"],
+            key="app_sort",
+        )
 
     # Load — only active pipeline applications (no rejected — those are deleted)
     app_jobs = get_all_jobs(
@@ -791,8 +795,11 @@ elif page == "📁 My Applications":
     )
     app_jobs = [j for j in app_jobs if j["status"] in PIPELINE]
 
-    if app_sort == "Score ↓":
-        app_jobs.sort(key=lambda j: (j.get("score") or -1), reverse=True)
+    _reverse = "↓" in app_sort
+    if app_sort.startswith("Score"):
+        app_jobs.sort(key=lambda j: (j.get("score") or -1), reverse=_reverse)
+    else:
+        app_jobs.sort(key=lambda j: (j.get("applied_at") or ""), reverse=_reverse)
 
     # ── pipeline summary bar ──────────────────────────────────────────────────
     db_stats = stats()

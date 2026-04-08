@@ -125,6 +125,39 @@ Five pages:
 
 ---
 
+## UI Workflow — Step by Step
+
+### 1. Set up your profile
+Go to **Profile** and fill in your name, email, LinkedIn, GitHub, target role/keywords, and paste your full resume as plain text. Hit **Save Profile**. Nothing works until this is done.
+
+### 2. Scrape jobs
+Go to **Actions → Scrape Jobs**. Choose your sources, location mode (US Remote / World Remote / Local), and freshness window (1 / 3 / 7 days). Hit **Run Scrape**. New jobs appear on the Job Board immediately.
+
+### 3. Fetch full descriptions
+Scraped job cards often contain only a short preview — not the full posting.
+
+Go to **Actions → Fetch Descriptions**. This visits each job URL with a headless browser and pulls the full description. Supports LinkedIn, Indeed, and Dice.
+
+> **If a description is still missing or truncated after fetching:** open the job card on the Job Board, click the job title link to open the original posting, copy the full description, paste it into the **"Paste full job description"** field, and hit **Save Description**. This is the most reliable method for any source.
+
+### 4. Score jobs
+Go to **Actions → Score Jobs**. Claude Haiku reads your resume and each job description and returns a 0–100 match score with matched skills, missing skills, and suggested keywords. Jobs without a description are skipped — fetch or paste descriptions first.
+
+Cards on the Job Board are color-coded by score: 🟢 75+ · 🟡 50–74 · 🟠 25–49 · 🔴 <25.
+
+### 5. Review and decide
+On the **Job Board**, expand any card to see the full description, score breakdown, and company context. Use the status dropdown to mark jobs as `applied`, `rejected`, or leave them as `new`.
+
+### 6. Tailor your resume and cover letter
+From a job card on the Job Board, hit **Tailor Resume + Cover Letter**. Claude Sonnet rewrites your resume bullets to mirror the job's language and generates a cover letter with a hook-first opener, company context, and your signature. Output lands in `output/<job-slug>/` as two `.docx` files.
+
+> The job must have a full description before tailoring. If the score breakdown shows "description too short," paste the full text first (step 3).
+
+### 7. Track your pipeline
+Jobs you mark as `applied` move to **My Applications**. From there you can advance them through `applied → interviewing → offer` with one click, or permanently remove them. The tracker is preserved across fresh scrape runs.
+
+---
+
 ## CLI Usage
 
 ### Scrape jobs
