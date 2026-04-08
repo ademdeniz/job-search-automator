@@ -94,10 +94,14 @@ def cmd_scrape(args):
 
 def cmd_fetch(args):
     """Fetch full job descriptions by visiting each job URL with a headless browser."""
-    from scrapers.linkedin import fetch_descriptions
+    from scrapers.linkedin import fetch_descriptions, _SUPPORTED_SOURCES
 
     source = args.source
     jobs = get_jobs_without_description(source=source)
+
+    # If no source filter, limit to sources we can actually fetch from
+    if not source:
+        jobs = [j for j in jobs if j.get("source", "") in _SUPPORTED_SOURCES]
 
     if not jobs:
         print(f"No jobs missing descriptions{' for source: ' + source if source else ''}.")

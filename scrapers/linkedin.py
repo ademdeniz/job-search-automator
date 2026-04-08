@@ -142,18 +142,37 @@ def _parse_card(card) -> Job:
         return None
 
 
+_SELECTORS = {
+    "linkedin": [
+        ".show-more-less-html__markup",
+        ".description__text",
+        "div[class*='description']",
+    ],
+    "indeed": [
+        "#jobDescriptionText",
+        "div[class*='jobsearch-jobDescriptionText']",
+        "div[data-testid='jobsearch-JobComponent-description']",
+    ],
+    "dice": [
+        "div[data-testid='jobDescription']",
+        ".job-description",
+        "div[class*='description']",
+    ],
+}
+_SUPPORTED_SOURCES = set(_SELECTORS.keys())
+
+
 def fetch_descriptions(jobs: list, on_progress=None) -> List[tuple]:
     """
-    Visit each job's LinkedIn URL with a headless browser and extract
-    the full job description.
+    Visit each job's URL with a headless browser and extract the full description.
+    Supports LinkedIn, Indeed, and Dice. Other sources are skipped.
 
     Returns list of (job_id, description_text).
-    on_progress(current, total, job) called after each fetch.
     """
     try:
         from playwright.sync_api import sync_playwright, TimeoutError as PWTimeout
     except ImportError:
-        print("[LinkedIn] playwright not installed.")
+        print("[Fetch] playwright not installed.")
         return []
 
     results = []
@@ -172,28 +191,36 @@ def fetch_descriptions(jobs: list, on_progress=None) -> List[tuple]:
         page = context.new_page()
 
         for i, job in enumerate(jobs, 1):
+            source = job.get("source", "").lower()
             desc = ""
-            print(f"  [{i:>3}/{total}] Fetching: {job['title'][:50]}", flush=True)
+            print(f"  [{i:>3}/{total}] [{source}] Fetching: {job['title'][:45]}", flush=True)
+
+            if source not in _SUPPORTED_SOURCES:
+                print(f"           → skipped (source not supported)", flush=True)
+                results.append((job["id"], desc))
+                if on_progress:
+                    on_progress(i, total, job, desc)
+                continue
+
             try:
-                page.goto(job["url"], wait_until="domcontentloaded", timeout=20000)
-                time.sleep(1)
+                page.goto(job["url"], wait_until="domcontentloaded", timeout=25000)
+                time.sleep(1.5)
 
-                # Expand "Show more" if present
-                try:
-                    btn = page.query_selector("button.show-more-less-html__button--more")
-                    if btn and btn.is_visible():
-                        btn.click()
-                        time.sleep(0.5)
-                except Exception:
-                    pass
-
-                # Try multiple selectors LinkedIn uses for job descriptions
-                for selector in [
-                    ".show-more-less-html__markup",
-                    ".description__text",
-                    ".job-details-jobs-unified-top-card__job-insight",
-                    "div[class*='description']",
+                # Expand "Show more" buttons (LinkedIn + Indeed)
+                for btn_sel in [
+                    "button.show-more-less-html__button--more",
+                    "button[id*='indeed-read-more']",
+                    "button[data-testid='read-more-button']",
                 ]:
+                    try:
+                        btn = page.query_selector(btn_sel)
+                        if btn and btn.is_visible():
+                            btn.click()
+                            time.sleep(0.5)
+                    except Exception:
+                        pass
+
+                for selector in _SELECTORS.get(source, []):
                     el = page.query_selector(selector)
                     if el:
                         desc = (el.inner_text() or "").strip()
@@ -201,17 +228,17 @@ def fetch_descriptions(jobs: list, on_progress=None) -> List[tuple]:
                             break
 
             except PWTimeout:
-                pass
+                print(f"           → timeout", flush=True)
             except Exception as e:
                 print(f"  [fetch] Error on job {job['id']}: {e}")
 
-            status = f"{len(desc)} chars" if desc else "no description"
+            status = f"{len(desc)} chars" if desc else "no description found"
             print(f"           → {status}", flush=True)
             results.append((job["id"], desc))
             if on_progress:
                 on_progress(i, total, job, desc)
 
-            time.sleep(1.2)  # polite delay between requests
+            time.sleep(1.2)
 
         browser.close()
 

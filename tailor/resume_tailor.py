@@ -220,42 +220,69 @@ _JOB_BOARD_DOMAINS = {
 }
 
 
-def _fetch_company_context(job_url: str) -> str:
+def _fetch_company_context(job_url: str, company: str, description: str, client) -> str:
     """
-    Try to fetch a brief description of the company from their own website.
-    Returns a clean text snippet (≤1 000 chars) or empty string on failure.
+    Build a structured company intelligence summary by:
+    1. Scraping the company's website (best-effort)
+    2. Asking Claude to extract values, culture, mission, and tech stack
+       from whatever we found + the job description itself.
+
+    Returns a concise structured summary or empty string on failure.
     """
     import requests as _req
 
-    if not job_url:
+    raw_web = ""
+    if job_url:
+        m = re.search(r"https?://(?:www\.)?([^/]+)", job_url)
+        if m:
+            domain = m.group(1).lower()
+            if not any(board in domain for board in _JOB_BOARD_DOMAINS):
+                headers = {"User-Agent": "Mozilla/5.0 (compatible; job-search-bot/1.0)"}
+                for url in [f"https://{domain}/about", f"https://www.{domain}/about", f"https://{domain}"]:
+                    try:
+                        resp = _req.get(url, timeout=6, headers=headers, allow_redirects=True)
+                        if resp.status_code == 200:
+                            text = re.sub(r"<[^>]+>", " ", resp.text)
+                            text = re.sub(r"\s+", " ", text).strip()
+                            if len(text) > 150:
+                                raw_web = text[:2000]
+                                break
+                    except Exception:
+                        continue
+
+    # Ask Claude to extract structured company intel from what we have
+    sources = []
+    if description:
+        sources.append(f"## Job Description\n{description[:3000]}")
+    if raw_web:
+        sources.append(f"## Company Website (raw)\n{raw_web}")
+
+    if not sources:
         return ""
 
-    # Extract domain from job URL
-    m = re.search(r"https?://(?:www\.)?([^/]+)", job_url)
-    if not m:
-        return ""
-    domain = m.group(1).lower()
+    prompt = textwrap.dedent(f"""
+        Based on the sources below, extract a concise company intelligence summary for {company}.
+        Return ONLY a short structured summary (max 300 words) covering:
+        - What the company does (product/service, customers, market)
+        - Mission or stated values (if mentioned)
+        - Culture signals (how they describe their team or work environment)
+        - Tech stack or tools mentioned
+        - Any notable facts relevant to a job candidate (stage, size, funding, growth)
 
-    # Skip job board domains — they don't tell us about the company
-    if any(board in domain for board in _JOB_BOARD_DOMAINS):
-        return ""
+        If something isn't mentioned, skip it — do not invent.
 
-    headers = {"User-Agent": "Mozilla/5.0 (compatible; job-search-bot/1.0)"}
+        {chr(10).join(sources)}
+    """).strip()
 
-    for url in [f"https://{domain}/about", f"https://www.{domain}/about", f"https://{domain}"]:
-        try:
-            resp = _req.get(url, timeout=6, headers=headers, allow_redirects=True)
-            if resp.status_code != 200:
-                continue
-            # Strip tags and collapse whitespace
-            text = re.sub(r"<[^>]+>", " ", resp.text)
-            text = re.sub(r"\s+", " ", text).strip()
-            if len(text) > 150:
-                return text[:1000]
-        except Exception:
-            continue
-
-    return ""
+    try:
+        resp = client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=400,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        return resp.content[0].text.strip()
+    except Exception:
+        return raw_web[:500] if raw_web else ""
 
 
 def tailor_job(job: dict, resume_text: Optional[str] = None) -> TailorResult:
@@ -279,19 +306,6 @@ def tailor_job(job: dict, resume_text: Optional[str] = None) -> TailorResult:
     else:
         company_line = f"Company: {company}"
 
-    # Fetch company context from their own website (best-effort, silent on failure)
-    print(f"[Tailor] Fetching company context from {job_url or 'N/A'}…")
-    company_context = _fetch_company_context(job_url)
-    if company_context:
-        print(f"[Tailor] Got {len(company_context)} chars of company context.")
-    else:
-        print("[Tailor] No company context found — proceeding with job description only.")
-
-    company_context_block = (
-        f"\n## Company Context (from their website)\n{company_context}\n"
-        if company_context else ""
-    )
-
     # Build system prompt from profile
     import sys as _sys
     _sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
@@ -300,6 +314,25 @@ def tailor_job(job: dict, resume_text: Optional[str] = None) -> TailorResult:
     system_prompt = _build_system_prompt(profile)
 
     client = anthropic.Anthropic()
+
+    # Use stored company context if available, otherwise fetch + extract with Claude
+    company_context = (job.get("company_context") or "").strip()
+    if company_context:
+        print(f"[Tailor] Using stored company context ({len(company_context)} chars).")
+    else:
+        print(f"[Tailor] Fetching company context for {company}…")
+        company_context = _fetch_company_context(job_url, company, description, client)
+        if company_context:
+            print(f"[Tailor] Got {len(company_context)} chars of company context.")
+            from storage.database import update_company_context
+            update_company_context(job.get("id"), company_context)
+        else:
+            print("[Tailor] No company context found — proceeding with job description only.")
+
+    company_context_block = (
+        f"\n## Company Intelligence\n{company_context}\n"
+        if company_context else ""
+    )
 
     user_msg = textwrap.dedent(f"""
         ## Candidate Resume

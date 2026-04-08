@@ -615,13 +615,18 @@ elif page == "🔧 Actions":
                 st.rerun()
 
     # ── fetch descriptions ────────────────────────────────────────────────────
-    with st.expander("📄 Fetch Descriptions (LinkedIn)"):
-        st.markdown("Visit each LinkedIn job page and extract the full description so jobs can be scored.")
-        no_desc = get_jobs_without_description(source="linkedin")
-        st.info(f"{len(no_desc)} LinkedIn job(s) missing descriptions.")
+    with st.expander("📄 Fetch Full Descriptions"):
+        st.markdown("Visit each job page and extract the full description so jobs can be scored. Supports **LinkedIn, Indeed, and Dice**.")
+        from scrapers.linkedin import _SUPPORTED_SOURCES
+        no_desc_all = [j for j in get_jobs_without_description() if j.get("source") in _SUPPORTED_SOURCES]
+        by_source = {}
+        for j in no_desc_all:
+            by_source[j["source"]] = by_source.get(j["source"], 0) + 1
+        summary = ", ".join(f"{s}: {n}" for s, n in by_source.items()) if by_source else "none"
+        st.info(f"{len(no_desc_all)} job(s) missing descriptions — {summary}")
         if st.button("▶ Fetch Descriptions"):
-            with st.spinner(f"Fetching {len(no_desc)} descriptions via headless browser… (this takes ~2 min)"):
-                out = run_cli(["main.py", "fetch", "--source", "linkedin"])
+            with st.spinner(f"Fetching {len(no_desc_all)} descriptions via headless browser… (this takes a few minutes)"):
+                out = run_cli(["main.py", "fetch"])
             st.code(out)
             st.rerun()
 

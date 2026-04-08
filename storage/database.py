@@ -39,7 +39,7 @@ def init_db():
     # Migrate existing DBs that pre-date the score/applied columns
     for col, definition in [
         ("score", "INTEGER"), ("score_reason", "TEXT"), ("scored_at", "TEXT"),
-        ("applied_at", "TEXT"),
+        ("applied_at", "TEXT"), ("company_context", "TEXT"),
     ]:
         try:
             conn.execute(f"ALTER TABLE jobs ADD COLUMN {col} {definition}")
@@ -123,6 +123,13 @@ def save_score(job_id: int, score: int, reason: str):
         "UPDATE jobs SET score=?, score_reason=?, scored_at=? WHERE id=?",
         (score, reason, datetime.now().isoformat(), job_id),
     )
+    conn.commit()
+    conn.close()
+
+
+def update_company_context(job_id: int, context: str):
+    conn = get_connection()
+    conn.execute("UPDATE jobs SET company_context=? WHERE id=?", (context, job_id))
     conn.commit()
     conn.close()
 
