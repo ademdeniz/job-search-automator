@@ -338,6 +338,17 @@ if page == "📋 Job Board":
                             placeholder="e.g. Veracyte",
                         )
 
+                    # If description exists but metadata fields are missing, offer to extract
+                    if has_desc and (not job.get("posted_date") or not job.get("job_type")):
+                        if st.button("🔍 Extract metadata from description", key=f"extract_meta_{job['id']}"):
+                            meta = _extract_metadata(job.get("description", ""))
+                            if meta:
+                                update_job_metadata(job["id"], **meta)
+                                st.success(f"Extracted: {', '.join(f'{k}={v}' for k,v in meta.items())}")
+                                st.rerun()
+                            else:
+                                st.info("No metadata found in description.")
+
                     if not has_desc:
                         st.caption("No description — paste one below to enable tailoring.")
                         manual_desc = st.text_area(
