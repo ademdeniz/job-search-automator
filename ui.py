@@ -760,9 +760,6 @@ elif page == "📁 My Applications":
                                 {job['status']}
                             </span>
                             <span style="color:#64748b; font-size:0.75rem;">
-                                📅 Posted: {_fmt_date(job.get('posted_date', ''))}
-                            </span>
-                            <span style="color:#64748b; font-size:0.75rem;">
                                 ✅ Applied: {_fmt_date(job.get('applied_at', ''))}
                             </span>
                             <span style="color:#64748b; font-size:0.8rem;">{job['source']}</span>
