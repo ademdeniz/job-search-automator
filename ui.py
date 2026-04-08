@@ -814,6 +814,8 @@ elif page == "📁 My Applications":
         level      = match_level(score)
         s_color    = SCORE_COLOR.get(level, "#94a3b8")
         st_color   = PIPELINE_COLOR.get(job["status"], "#94a3b8")
+        _chip_type   = f'<span style="color:#64748b; font-size:0.75rem;">🗂 {job["job_type"]}</span>' if job.get("job_type") else ""
+        _chip_salary = f'<span style="color:#64748b; font-size:0.75rem;">💰 {job["salary"]}</span>' if job.get("salary") else ""
 
         with st.container():
             st.markdown(
@@ -843,8 +845,8 @@ elif page == "📁 My Applications":
                             <span style="color:#64748b; font-size:0.75rem;">
                                 ✅ Applied: {_fmt_date(job.get('applied_at', ''))}
                             </span>
-                            {f'<span style="color:#64748b; font-size:0.75rem;">🗂 {job["job_type"]}</span>' if job.get('job_type') else ''}
-                            {f'<span style="color:#64748b; font-size:0.75rem;">💰 {job["salary"]}</span>' if job.get('salary') else ''}
+                            {_chip_type}
+                            {_chip_salary}
                             <span style="color:#64748b; font-size:0.8rem;">{job['source']}</span>
                         </div>
                     </div>
