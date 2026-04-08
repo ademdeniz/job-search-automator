@@ -141,6 +141,21 @@ def update_description(job_id: int, description: str):
     conn.close()
 
 
+def update_job_metadata(job_id: int, **fields):
+    """Update any subset of salary, job_type, posted_date for a job."""
+    if not fields:
+        return
+    allowed = {"salary", "job_type", "posted_date"}
+    clean = {k: v for k, v in fields.items() if k in allowed and v}
+    if not clean:
+        return
+    conn = get_connection()
+    sets = ", ".join(f"{k}=?" for k in clean)
+    conn.execute(f"UPDATE jobs SET {sets} WHERE id=?", (*clean.values(), job_id))
+    conn.commit()
+    conn.close()
+
+
 def get_jobs_without_description(source: Optional[str] = None) -> List[dict]:
     conn = get_connection()
     clauses = ["(description IS NULL OR description = '')"]

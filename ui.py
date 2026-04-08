@@ -23,7 +23,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 from storage.database import (
     get_all_jobs, get_job_by_id, update_status, save_score,
     get_unscored_jobs, get_jobs_without_description, stats, get_applied_jobs,
-    delete_job,
+    delete_job, update_job_metadata,
 )
 from storage.profile import load_profile, save_profile
 
@@ -56,6 +56,48 @@ VALID_STATUSES = ["new", "applied", "interviewing", "offer", "rejected"]
 # LinkedIn + Indeed first — best location-aware sources
 SOURCES = ["linkedin", "indeed", "remoteok", "weworkremotely", "dice", "greenhouse", "lever", "himalayas", "jobspresso"]
 ERIE_SOURCES = ["linkedin", "indeed"]   # only these support geographic location well
+
+
+def _extract_metadata(text: str) -> dict:
+    """Extract posted_date, salary, job_type from pasted job description text."""
+    import re
+    from datetime import datetime, timedelta
+    result = {}
+
+    t = text.lower()
+
+    # ── Job type ──────────────────────────────────────────────────────────────
+    if re.search(r'\bfull[- ]time\b', t):
+        result["job_type"] = "full-time"
+    elif re.search(r'\bpart[- ]time\b', t):
+        result["job_type"] = "part-time"
+    elif re.search(r'\bcontract\b', t):
+        result["job_type"] = "contract"
+
+    # ── Posted date ───────────────────────────────────────────────────────────
+    today = datetime.now()
+    if re.search(r'posted\s+(just\s+now|today)', t):
+        result["posted_date"] = today.strftime("%Y-%m-%d")
+    else:
+        m = re.search(r'posted\s+(\d+)\s+day', t)
+        if m:
+            result["posted_date"] = (today - timedelta(days=int(m.group(1)))).strftime("%Y-%m-%d")
+        else:
+            m = re.search(r'posted\s+(\d+)\s+hour', t)
+            if m:
+                result["posted_date"] = today.strftime("%Y-%m-%d")
+
+    # ── Salary ────────────────────────────────────────────────────────────────
+    # "$80,000 - $120,000" or "$45 - $60 per hour" or "$120K"
+    m = re.search(r'\$([\d,]+[kK]?)\s*[-–]\s*\$([\d,]+[kK]?)', text)
+    if m:
+        result["salary"] = f"${m.group(1)} - ${m.group(2)}"
+    else:
+        m = re.search(r'salary[:\s]+\$([\d,]+[kK]?)', text, re.IGNORECASE)
+        if m:
+            result["salary"] = f"${m.group(1)}"
+
+    return result
 
 
 def _fmt_date(raw: str) -> str:
@@ -307,7 +349,13 @@ if page == "📋 Job Board":
                         if manual_desc and st.button("💾 Save description", key=f"save_desc_{job['id']}"):
                             from storage.database import update_description
                             update_description(job["id"], manual_desc)
-                            st.success("Description saved.")
+                            meta = _extract_metadata(manual_desc)
+                            if meta:
+                                update_job_metadata(job["id"], **meta)
+                            st.success(
+                                "Description saved."
+                                + (f" Extracted: {', '.join(f'{k}={v}' for k,v in meta.items())}" if meta else "")
+                            )
                             st.rerun()
                     else:
                         manual_desc = ""
