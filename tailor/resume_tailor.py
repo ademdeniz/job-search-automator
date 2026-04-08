@@ -31,7 +31,8 @@ OUTPUT_DIR = os.path.join(os.path.dirname(__file__), "..", "output")
 MODEL = "claude-sonnet-4-6"
 
 _TAILOR_SYSTEM_TEMPLATE = textwrap.dedent("""
-    You are an expert resume writer and career coach specialising in QA / SDET / test automation roles.
+    You are an expert resume writer and career coach specialising in {specialisation}.
+    The candidate is targeting roles as: {target_role}.
     You will receive a candidate's resume, a job posting, and optionally a company context snippet.
 
     Your task is to produce TWO documents, returned as a single JSON object (no markdown fences):
@@ -128,11 +129,16 @@ _TAILOR_SYSTEM_TEMPLATE = textwrap.dedent("""
 
 
 def _build_system_prompt(profile: dict) -> str:
-    name     = profile.get("name", "")
-    email    = profile.get("email", "")
-    linkedin = profile.get("linkedin", "").strip().rstrip("/")
-    github   = profile.get("github", "").strip().rstrip("/")
+    name           = profile.get("name", "")
+    email          = profile.get("email", "")
+    linkedin       = profile.get("linkedin", "").strip().rstrip("/")
+    github         = profile.get("github", "").strip().rstrip("/")
+    title          = profile.get("title", "").strip()
+    target_role    = profile.get("target_role", "").strip()
     writing_sample = profile.get("writing_sample", "").strip()
+
+    specialisation = title or target_role or "professional roles"
+    target_label   = target_role or title or "the candidate's target role"
 
     contact_parts = [c for c in [email, linkedin] if c]
     linkedin_line = " | " + " | ".join(contact_parts[1:]) if len(contact_parts) > 1 else ""
@@ -161,6 +167,8 @@ def _build_system_prompt(profile: dict) -> str:
 
     return (
         _TAILOR_SYSTEM_TEMPLATE
+        .replace("{specialisation}", specialisation)
+        .replace("{target_role}", target_label)
         .replace("{name}", name)
         .replace("{email}", email)
         .replace("{linkedin_line}", linkedin_line)

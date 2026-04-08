@@ -581,7 +581,7 @@ elif page == "🔧 Actions":
 
         s_col1, s_col2 = st.columns(2)
         with s_col1:
-            _default_kw = load_profile().get("target_role", "") or "QA engineer SDET test automation"
+            _default_kw = load_profile().get("target_role", "") or ""
             if "scrape_keywords" not in st.session_state:
                 st.session_state["scrape_keywords"] = _default_kw
             keywords_input = st.text_input(
@@ -921,13 +921,13 @@ elif page == "👤 Profile":
         p_title = st.text_input(
             "Professional title",
             value=profile.get("title", ""),
-            placeholder="e.g. Senior SDET / QA Automation Engineer",
+            placeholder="e.g. Senior Software Engineer / Product Designer / HR Manager",
             help="Appears under your name in the cover letter signature.",
         )
         p_target_role = st.text_input(
             "Target role / keywords",
             value=profile.get("target_role", ""),
-            placeholder="e.g. SDET test automation Appium",
+            placeholder="e.g. software engineer Python React  /  UX designer Figma  /  HR business partner",
             help="Used as the default search keywords when scraping jobs.",
         )
     with c2:
