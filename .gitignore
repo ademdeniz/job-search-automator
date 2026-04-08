@@ -13,6 +13,7 @@ env/
 
 # Profile — contains personal resume and contact info
 profile.json
+resume.txt
 
 # Generated exports
 *.csv

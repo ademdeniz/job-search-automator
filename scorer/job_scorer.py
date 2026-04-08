@@ -3,9 +3,9 @@
 """
 Job fit scorer using Claude API.
 
-Reads the candidate's resume from resume.txt (project root) and scores
-each job description on a 0-100 scale, returning a structured result with
-matched skills, gaps, and a one-line summary.
+Reads the candidate's resume from profile.json and scores each job description
+on a 0-100 scale, returning a structured result with matched skills, gaps,
+and a one-line summary.
 """
 
 import json
@@ -15,8 +15,6 @@ from dataclasses import dataclass
 from typing import List, Optional
 
 import anthropic
-
-RESUME_PATH = os.path.join(os.path.dirname(__file__), "..", "resume.txt")
 
 # Use Haiku for cost-efficient batch scoring — fast and accurate enough for fit analysis.
 MODEL = "claude-haiku-4-5-20251001"
@@ -58,13 +56,13 @@ class ScoreResult:
 
 
 def _load_resume() -> str:
-    if not os.path.exists(RESUME_PATH):
-        raise FileNotFoundError(
-            f"resume.txt not found at {RESUME_PATH}. "
-            "Run: python main.py resume --set  (or create resume.txt manually)"
-        )
-    with open(RESUME_PATH, encoding="utf-8") as f:
-        return f.read().strip()
+    import sys
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+    from storage.profile import load_profile
+    resume = load_profile().get("resume", "").strip()
+    if not resume:
+        raise FileNotFoundError("No resume found. Add your resume on the Profile page.")
+    return resume
 
 
 def score_job(title: str, company: str, description: str,

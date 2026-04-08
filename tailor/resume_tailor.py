@@ -179,19 +179,14 @@ class TailorResult:
 
 
 def _load_resume() -> str:
-    """Load resume text from profile.json, falling back to resume.txt."""
+    """Load resume text from profile.json."""
     import sys
     sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
     from storage.profile import load_profile
-    profile = load_profile()
-    if profile.get("resume", "").strip():
-        return profile["resume"].strip()
-    # Legacy fallback
-    resume_path = os.path.join(os.path.dirname(__file__), "..", "resume.txt")
-    if os.path.exists(resume_path):
-        with open(resume_path, encoding="utf-8") as f:
-            return f.read().strip()
-    raise FileNotFoundError("No resume found. Add your resume in the Profile page.")
+    resume = load_profile().get("resume", "").strip()
+    if not resume:
+        raise FileNotFoundError("No resume found. Add your resume on the Profile page.")
+    return resume
 
 
 # Job aggregators — when the stored company is one of these,
