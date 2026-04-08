@@ -58,6 +58,24 @@ SOURCES = ["linkedin", "indeed", "remoteok", "weworkremotely", "dice", "greenhou
 ERIE_SOURCES = ["linkedin", "indeed"]   # only these support geographic location well
 
 
+def _fmt_date(raw: str) -> str:
+    """Parse various date formats and return a clean 'Apr 07, 2026' string."""
+    if not raw:
+        return "N/A"
+    from datetime import datetime
+    from email.utils import parsedate_to_datetime
+    for fmt in ("%Y-%m-%dT%H:%M:%S.%f", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d"):
+        try:
+            return datetime.strptime(raw[:19], fmt).strftime("%b %d, %Y")
+        except ValueError:
+            pass
+    try:
+        return parsedate_to_datetime(raw).strftime("%b %d, %Y")
+    except Exception:
+        pass
+    return raw[:10] if len(raw) >= 10 else raw
+
+
 def match_level(score):
     if score is None:
         return None
@@ -731,7 +749,7 @@ elif page == "📁 My Applications":
                                 {job['company']} · {job['location']}
                             </span>
                         </div>
-                        <div style="display:flex; gap:8px; align-items:center;">
+                        <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
                             <span style="background:{s_color}22; color:{s_color};
                                          padding:2px 10px; border-radius:99px; font-size:0.8rem;">
                                 {score_badge(score)}
@@ -740,6 +758,12 @@ elif page == "📁 My Applications":
                                          padding:2px 10px; border-radius:99px; font-size:0.8rem;
                                          font-weight:600;">
                                 {job['status']}
+                            </span>
+                            <span style="color:#64748b; font-size:0.75rem;">
+                                📅 Posted: {_fmt_date(job.get('posted_date', ''))}
+                            </span>
+                            <span style="color:#64748b; font-size:0.75rem;">
+                                ✅ Applied: {_fmt_date(job.get('applied_at', ''))}
                             </span>
                             <span style="color:#64748b; font-size:0.8rem;">{job['source']}</span>
                         </div>

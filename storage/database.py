@@ -36,8 +36,11 @@ def init_db():
             scored_at    TEXT
         )
     """)
-    # Migrate existing DBs that pre-date the score columns
-    for col, definition in [("score", "INTEGER"), ("score_reason", "TEXT"), ("scored_at", "TEXT")]:
+    # Migrate existing DBs that pre-date the score/applied columns
+    for col, definition in [
+        ("score", "INTEGER"), ("score_reason", "TEXT"), ("scored_at", "TEXT"),
+        ("applied_at", "TEXT"),
+    ]:
         try:
             conn.execute(f"ALTER TABLE jobs ADD COLUMN {col} {definition}")
         except Exception:
@@ -73,8 +76,15 @@ def save_jobs(jobs: List[Job]) -> int:
 
 
 def update_status(job_id: int, status: str):
+    from datetime import datetime
     conn = get_connection()
-    conn.execute("UPDATE jobs SET status=? WHERE id=?", (status, job_id))
+    if status == "applied":
+        conn.execute(
+            "UPDATE jobs SET status=?, applied_at=? WHERE id=?",
+            (status, datetime.now().isoformat(), job_id),
+        )
+    else:
+        conn.execute("UPDATE jobs SET status=? WHERE id=?", (status, job_id))
     conn.commit()
     conn.close()
 
