@@ -1090,11 +1090,32 @@ elif page == "📁 My Applications":
                             with st.expander("🎤 Interview Prep", expanded=True):
                                 st.markdown(st.session_state[prep_key])
                                 dl_col, clr_col = st.columns([2, 1])
+                                # Build .docx in memory
+                                import io as _io
+                                from docx import Document as _Document
+                                from docx.shared import Pt as _Pt
+                                _doc = _Document()
+                                _doc.add_heading(f"Interview Prep — {job['title']} @ {job['company']}", level=1)
+                                for line in st.session_state[prep_key].splitlines():
+                                    line = line.strip()
+                                    if not line:
+                                        _doc.add_paragraph("")
+                                    elif line.startswith("**Q") and line.endswith("**"):
+                                        p = _doc.add_paragraph()
+                                        run = p.add_run(line.strip("*"))
+                                        run.bold = True
+                                        run.font.size = _Pt(11)
+                                    else:
+                                        _doc.add_paragraph(line.lstrip("*").rstrip("*"))
+                                _buf = _io.BytesIO()
+                                _doc.save(_buf)
+                                _buf.seek(0)
+                                _fname = f"interview_prep_{job['company'].replace(' ','_')}_{job['title'].replace(' ','_')[:30]}.docx"
                                 dl_col.download_button(
-                                    "⬇ Download as .txt",
-                                    data=st.session_state[prep_key],
-                                    file_name=f"interview_prep_{job['company'].replace(' ','_')}_{job['title'].replace(' ','_')[:30]}.txt",
-                                    mime="text/plain",
+                                    "⬇ Download as .docx",
+                                    data=_buf.getvalue(),
+                                    file_name=_fname,
+                                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                                     key=f"prep_dl_{job['id']}",
                                 )
                                 if clr_col.button("Clear", key=f"prep_clear_{job['id']}"):
