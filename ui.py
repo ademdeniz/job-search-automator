@@ -1087,11 +1087,19 @@ elif page == "📁 My Applications":
                                     st.error(f"Interview prep failed: {e}")
 
                         if prep_key in st.session_state:
-                            st.markdown("### 🎤 Interview Prep")
-                            st.markdown(st.session_state[prep_key])
-                            if st.button("Clear", key=f"prep_clear_{job['id']}"):
-                                del st.session_state[prep_key]
-                                st.rerun()
+                            with st.expander("🎤 Interview Prep", expanded=True):
+                                st.markdown(st.session_state[prep_key])
+                                dl_col, clr_col = st.columns([2, 1])
+                                dl_col.download_button(
+                                    "⬇ Download as .txt",
+                                    data=st.session_state[prep_key],
+                                    file_name=f"interview_prep_{job['company'].replace(' ','_')}_{job['title'].replace(' ','_')[:30]}.txt",
+                                    mime="text/plain",
+                                    key=f"prep_dl_{job['id']}",
+                                )
+                                if clr_col.button("Clear", key=f"prep_clear_{job['id']}"):
+                                    del st.session_state[prep_key]
+                                    st.rerun()
 
 
 # ════════════════════════════════════════════════════════════════════════════
