@@ -169,6 +169,36 @@ def show_cli_result(out: str, success: bool):
         st.code(out)
 
 
+# ── PDF conversion via LibreOffice ───────────────────────────────────────────
+def docx_to_pdf(docx_path: str):
+    """
+    Convert a .docx file to PDF using LibreOffice headless.
+    Returns the PDF path on success, None if LibreOffice is not installed or conversion fails.
+    """
+    import shutil
+    soffice = shutil.which("soffice") or shutil.which("libreoffice")
+    if not soffice:
+        return None
+    out_dir = os.path.dirname(docx_path)
+    try:
+        result = subprocess.run(
+            [soffice, "--headless", "--convert-to", "pdf", "--outdir", out_dir, docx_path],
+            capture_output=True, text=True, timeout=60,
+        )
+        if result.returncode != 0:
+            return None
+        pdf_path = os.path.splitext(docx_path)[0] + ".pdf"
+        return pdf_path if os.path.exists(pdf_path) else None
+    except Exception:
+        return None
+
+
+def has_libreoffice() -> bool:
+    """Return True if LibreOffice is available for PDF conversion."""
+    import shutil
+    return bool(shutil.which("soffice") or shutil.which("libreoffice"))
+
+
 # ── direct Claude call ────────────────────────────────────────────────────────
 def claude_call(system: str, user: str, model: str = "claude-haiku-4-5-20251001", max_tokens: int = 2048) -> str:
     """Make a direct Claude API call. Returns response text or raises."""

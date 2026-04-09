@@ -14,6 +14,7 @@ from storage.database import (
 from storage.profile import load_profile
 from pages.utils import (
     SCORE_COLOR, PIPELINE, PIPELINE_COLOR, match_level, score_badge, fmt_date, claude_call,
+    docx_to_pdf, has_libreoffice,
 )
 
 NEXT_STAGE = {
@@ -304,17 +305,32 @@ def render():
                                         run.font.size = _Pt(11)
                                     else:
                                         _doc.add_paragraph(line.lstrip("*").rstrip("*"))
+                                _fname_base = f"interview_prep_{job['company'].replace(' ','_')}_{job['title'].replace(' ','_')[:30]}"
                                 _buf = io.BytesIO()
                                 _doc.save(_buf)
                                 _buf.seek(0)
-                                _fname = f"interview_prep_{job['company'].replace(' ','_')}_{job['title'].replace(' ','_')[:30]}.docx"
                                 dl_col.download_button(
                                     "⬇ Download as .docx",
                                     data=_buf.getvalue(),
-                                    file_name=_fname,
+                                    file_name=f"{_fname_base}.docx",
                                     mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                                     key=f"prep_dl_{job['id']}",
                                 )
+                                if has_libreoffice():
+                                    import tempfile, os as _os
+                                    with tempfile.NamedTemporaryFile(suffix=".docx", delete=False) as _tmp:
+                                        _tmp_path = _tmp.name
+                                        _doc.save(_tmp_path)
+                                    _pdf_path = docx_to_pdf(_tmp_path)
+                                    if _pdf_path and _os.path.exists(_pdf_path):
+                                        with open(_pdf_path, "rb") as _pf:
+                                            dl_col.download_button(
+                                                "⬇ Download as .pdf",
+                                                data=_pf.read(),
+                                                file_name=f"{_fname_base}.pdf",
+                                                mime="application/pdf",
+                                                key=f"prep_dl_pdf_{job['id']}",
+                                            )
                                 if clr_col.button("Clear", key=f"prep_clear_{job['id']}"):
                                     del st.session_state[prep_key]
                                     update_interview_prep(job["id"], "")

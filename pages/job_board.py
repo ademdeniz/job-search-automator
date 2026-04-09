@@ -9,7 +9,7 @@ from storage.database import (
 from storage.profile import load_profile
 from pages.utils import (
     VALID_STATUSES, SOURCES, SCORE_COLOR, STATUS_COLOR,
-    match_level, score_badge, extract_metadata, run_cli,
+    match_level, score_badge, extract_metadata, run_cli, docx_to_pdf, has_libreoffice,
 )
 
 AGGREGATORS = {
@@ -228,6 +228,16 @@ def render():
                                     mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                                     key=f"dl_resume_{job['id']}",
                                 )
+                            if has_libreoffice():
+                                pdf = docx_to_pdf(files["resume"])
+                                if pdf and os.path.exists(pdf):
+                                    with open(pdf, "rb") as f:
+                                        dl_col1.download_button(
+                                            "⬇ Resume.pdf", data=f.read(),
+                                            file_name=f"resume_{co}.pdf",
+                                            mime="application/pdf",
+                                            key=f"dl_resume_pdf_{job['id']}",
+                                        )
                         if files.get("cover_letter") and os.path.exists(files["cover_letter"]):
                             with open(files["cover_letter"], "rb") as f:
                                 dl_col2.download_button(
@@ -236,3 +246,13 @@ def render():
                                     mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                                     key=f"dl_cl_{job['id']}",
                                 )
+                            if has_libreoffice():
+                                pdf = docx_to_pdf(files["cover_letter"])
+                                if pdf and os.path.exists(pdf):
+                                    with open(pdf, "rb") as f:
+                                        dl_col2.download_button(
+                                            "⬇ Cover Letter.pdf", data=f.read(),
+                                            file_name=f"cover_letter_{co}.pdf",
+                                            mime="application/pdf",
+                                            key=f"dl_cl_pdf_{job['id']}",
+                                        )
