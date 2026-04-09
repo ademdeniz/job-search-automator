@@ -8,7 +8,7 @@ This file gives Claude Code instant context about this project. Read it before d
 
 A personal job search automation tool. Scrapes 9 job boards, scores every posting against a resume using Claude AI, tailors resume + cover letter per role, and tracks the full application pipeline. Runs as a Streamlit UI or via CLI.
 
-Built by Adem Garic (SDET/QA engineer). Designed to be role-agnostic — any user fills in their own `profile.json` and the tool adapts.
+Fully role-agnostic — the user fills in their own `profile.json` (name, resume, title, target role) and the tool adapts. Works for any field: engineering, design, HR, product, etc.
 
 ---
 
