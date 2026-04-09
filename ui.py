@@ -516,57 +516,6 @@ if page == "📋 Job Board":
                                     key=f"dl_cl_{job['id']}",
                                 )
 
-                    # ── Interview Prep ────────────────────────────────────────
-                    st.divider()
-                    prep_key = f"interview_prep_{job['id']}"
-                    prep_desc = job.get("description", "").strip()
-                    if not prep_desc:
-                        st.caption("🎤 Interview prep requires a job description — paste one above first.")
-                    else:
-                        if st.button("🎤 Generate Interview Prep", key=f"prep_btn_{job['id']}"):
-                            _profile = load_profile()
-                            _resume  = _profile.get("resume", "").strip()
-                            with st.spinner("Claude is generating interview questions and answers…"):
-                                try:
-                                    prep_text = _claude_call(
-                                        system=(
-                                            "You are an expert technical interview coach. "
-                                            "Given a job description and the candidate's resume, generate the 10 most likely "
-                                            "interview questions for this specific role, along with a tailored answer for each "
-                                            "based on the candidate's real experience. "
-                                            "Format as:\n\n"
-                                            "**Q1: [Question]**\n"
-                                            "[Tailored answer using candidate's specific projects, metrics, and technologies]\n\n"
-                                            "**Q2: [Question]**\n"
-                                            "[Answer]\n\n"
-                                            "...and so on.\n\n"
-                                            "Rules:\n"
-                                            "- Questions must be specific to THIS role and company, not generic.\n"
-                                            "- Answers must reference the candidate's actual experience — real project names, real numbers.\n"
-                                            "- Mix technical, behavioural, and situational questions.\n"
-                                            "- Answers should be 3-5 sentences — enough to speak confidently, not a wall of text.\n"
-                                            "- Do not invent experience the candidate doesn't have."
-                                        ),
-                                        user=(
-                                            f"## Job Posting\n"
-                                            f"Title: {job['title']}\n"
-                                            f"Company: {job['company']}\n\n"
-                                            f"{prep_desc[:4000]}\n\n"
-                                            f"## Candidate Resume\n{_resume[:3000]}"
-                                        ),
-                                        model="claude-sonnet-4-6",
-                                        max_tokens=3000,
-                                    )
-                                    st.session_state[prep_key] = prep_text
-                                except Exception as e:
-                                    st.error(f"Interview prep failed: {e}")
-
-                        if prep_key in st.session_state:
-                            st.markdown("### 🎤 Interview Prep")
-                            st.markdown(st.session_state[prep_key])
-                            if st.button("Clear", key=f"prep_clear_{job['id']}"):
-                                del st.session_state[prep_key]
-                                st.rerun()
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -1090,6 +1039,58 @@ elif page == "📁 My Applications":
                             )
                             if st.button("Clear", key=f"followup_clear_{job['id']}"):
                                 del st.session_state[followup_key]
+                                st.rerun()
+
+                    # ── Interview Prep ────────────────────────────────────────
+                    st.divider()
+                    prep_key = f"interview_prep_{job['id']}"
+                    prep_desc = job.get("description", "").strip()
+                    if not prep_desc:
+                        st.caption("🎤 Interview prep requires a job description — open the job on Job Board and paste one first.")
+                    else:
+                        if st.button("🎤 Generate Interview Prep", key=f"prep_btn_{job['id']}"):
+                            _profile = load_profile()
+                            _resume  = _profile.get("resume", "").strip()
+                            with st.spinner("Claude is generating interview questions and answers…"):
+                                try:
+                                    prep_text = _claude_call(
+                                        system=(
+                                            "You are an expert technical interview coach. "
+                                            "Given a job description and the candidate's resume, generate the 10 most likely "
+                                            "interview questions for this specific role, along with a tailored answer for each "
+                                            "based on the candidate's real experience. "
+                                            "Format as:\n\n"
+                                            "**Q1: [Question]**\n"
+                                            "[Tailored answer using candidate's specific projects, metrics, and technologies]\n\n"
+                                            "**Q2: [Question]**\n"
+                                            "[Answer]\n\n"
+                                            "...and so on.\n\n"
+                                            "Rules:\n"
+                                            "- Questions must be specific to THIS role and company, not generic.\n"
+                                            "- Answers must reference the candidate's actual experience — real project names, real numbers.\n"
+                                            "- Mix technical, behavioural, and situational questions.\n"
+                                            "- Answers should be 3-5 sentences — enough to speak confidently, not a wall of text.\n"
+                                            "- Do not invent experience the candidate doesn't have."
+                                        ),
+                                        user=(
+                                            f"## Job Posting\n"
+                                            f"Title: {job['title']}\n"
+                                            f"Company: {job['company']}\n\n"
+                                            f"{prep_desc[:4000]}\n\n"
+                                            f"## Candidate Resume\n{_resume[:3000]}"
+                                        ),
+                                        model="claude-sonnet-4-6",
+                                        max_tokens=3000,
+                                    )
+                                    st.session_state[prep_key] = prep_text
+                                except Exception as e:
+                                    st.error(f"Interview prep failed: {e}")
+
+                        if prep_key in st.session_state:
+                            st.markdown("### 🎤 Interview Prep")
+                            st.markdown(st.session_state[prep_key])
+                            if st.button("Clear", key=f"prep_clear_{job['id']}"):
+                                del st.session_state[prep_key]
                                 st.rerun()
 
 
