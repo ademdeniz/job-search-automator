@@ -193,6 +193,30 @@ def _show_cli_result(out: str, success: bool):
         st.code(out)
 
 
+def _claude_call(system: str, user: str, model: str = "claude-haiku-4-5-20251001", max_tokens: int = 2048) -> str:
+    """Make a direct Claude API call. Returns response text or raises."""
+    import anthropic as _anthropic
+    env = os.environ.copy()
+    if not env.get("ANTHROPIC_API_KEY"):
+        try:
+            with open(os.path.expanduser("~/.zshrc")) as f:
+                for line in f:
+                    line = line.strip()
+                    if line.startswith("export ANTHROPIC_API_KEY="):
+                        os.environ["ANTHROPIC_API_KEY"] = line.split("=", 1)[1].strip().strip("'\"")
+                        break
+        except Exception:
+            pass
+    client = _anthropic.Anthropic()
+    msg = client.messages.create(
+        model=model,
+        max_tokens=max_tokens,
+        system=system,
+        messages=[{"role": "user", "content": user}],
+    )
+    return msg.content[0].text.strip()
+
+
 # ── sidebar ───────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.title("🎯 Job Search")
@@ -491,6 +515,58 @@ if page == "📋 Job Board":
                                     mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                                     key=f"dl_cl_{job['id']}",
                                 )
+
+                    # ── Interview Prep ────────────────────────────────────────
+                    st.divider()
+                    prep_key = f"interview_prep_{job['id']}"
+                    prep_desc = job.get("description", "").strip()
+                    if not prep_desc:
+                        st.caption("🎤 Interview prep requires a job description — paste one above first.")
+                    else:
+                        if st.button("🎤 Generate Interview Prep", key=f"prep_btn_{job['id']}"):
+                            _profile = load_profile()
+                            _resume  = _profile.get("resume", "").strip()
+                            with st.spinner("Claude is generating interview questions and answers…"):
+                                try:
+                                    prep_text = _claude_call(
+                                        system=(
+                                            "You are an expert technical interview coach. "
+                                            "Given a job description and the candidate's resume, generate the 10 most likely "
+                                            "interview questions for this specific role, along with a tailored answer for each "
+                                            "based on the candidate's real experience. "
+                                            "Format as:\n\n"
+                                            "**Q1: [Question]**\n"
+                                            "[Tailored answer using candidate's specific projects, metrics, and technologies]\n\n"
+                                            "**Q2: [Question]**\n"
+                                            "[Answer]\n\n"
+                                            "...and so on.\n\n"
+                                            "Rules:\n"
+                                            "- Questions must be specific to THIS role and company, not generic.\n"
+                                            "- Answers must reference the candidate's actual experience — real project names, real numbers.\n"
+                                            "- Mix technical, behavioural, and situational questions.\n"
+                                            "- Answers should be 3-5 sentences — enough to speak confidently, not a wall of text.\n"
+                                            "- Do not invent experience the candidate doesn't have."
+                                        ),
+                                        user=(
+                                            f"## Job Posting\n"
+                                            f"Title: {job['title']}\n"
+                                            f"Company: {job['company']}\n\n"
+                                            f"{prep_desc[:4000]}\n\n"
+                                            f"## Candidate Resume\n{_resume[:3000]}"
+                                        ),
+                                        model="claude-sonnet-4-6",
+                                        max_tokens=3000,
+                                    )
+                                    st.session_state[prep_key] = prep_text
+                                except Exception as e:
+                                    st.error(f"Interview prep failed: {e}")
+
+                        if prep_key in st.session_state:
+                            st.markdown("### 🎤 Interview Prep")
+                            st.markdown(st.session_state[prep_key])
+                            if st.button("Clear", key=f"prep_clear_{job['id']}"):
+                                del st.session_state[prep_key]
+                                st.rerun()
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -956,6 +1032,65 @@ elif page == "📁 My Applications":
                     })
                     _gc_url = f"https://calendar.google.com/calendar/render?{_gc_params}"
                     st.link_button("📅 Add to Google Calendar", _gc_url)
+
+                    # ── Follow-up email drafter ───────────────────────────────
+                    from datetime import datetime as _dt
+                    _applied_at = job.get("applied_at") or ""
+                    _days_since = None
+                    if _applied_at:
+                        try:
+                            _applied_dt = _dt.fromisoformat(_applied_at[:19])
+                            _days_since = (_dt.now() - _applied_dt).days
+                        except Exception:
+                            pass
+
+                    if job["status"] == "applied" and _days_since is not None and _days_since >= 7:
+                        st.divider()
+                        st.caption(f"Applied {_days_since} days ago — no response yet.")
+                        followup_key = f"followup_{job['id']}"
+                        if st.button("✉️ Draft Follow-up Email", key=f"followup_btn_{job['id']}"):
+                            _profile = load_profile()
+                            with st.spinner("Drafting follow-up email…"):
+                                try:
+                                    followup_text = _claude_call(
+                                        system=(
+                                            "You are helping a job candidate write a brief, professional follow-up email "
+                                            "after submitting a job application with no response. "
+                                            "The email should be:\n"
+                                            "- 3-4 sentences max. Short. Respectful of their time.\n"
+                                            "- Reference the specific role and company by name.\n"
+                                            "- Reaffirm genuine interest without sounding desperate.\n"
+                                            "- End with a clear, low-pressure call to action.\n"
+                                            "- Sound like a real human wrote it — no buzzwords, no corporate filler.\n"
+                                            "- No subject line — just the email body.\n"
+                                            "- Sign off with the candidate's name."
+                                        ),
+                                        user=(
+                                            f"Write a follow-up email for:\n"
+                                            f"Role: {job['title']}\n"
+                                            f"Company: {job['company']}\n"
+                                            f"Applied: {_days_since} days ago\n"
+                                            f"Candidate name: {_profile.get('name', '')}\n"
+                                            f"Candidate email: {_profile.get('email', '')}"
+                                        ),
+                                        model="claude-haiku-4-5-20251001",
+                                        max_tokens=300,
+                                    )
+                                    st.session_state[followup_key] = followup_text
+                                except Exception as e:
+                                    st.error(f"Follow-up draft failed: {e}")
+
+                        if followup_key in st.session_state:
+                            st.markdown("**✉️ Follow-up Draft**")
+                            st.text_area(
+                                "Copy and send:",
+                                value=st.session_state[followup_key],
+                                height=160,
+                                key=f"followup_text_{job['id']}",
+                            )
+                            if st.button("Clear", key=f"followup_clear_{job['id']}"):
+                                del st.session_state[followup_key]
+                                st.rerun()
 
 
 # ════════════════════════════════════════════════════════════════════════════
