@@ -23,7 +23,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 from storage.database import (
     get_all_jobs, get_job_by_id, update_status, save_score,
     get_unscored_jobs, get_jobs_without_description, stats, get_applied_jobs,
-    delete_job, update_job_metadata, update_notes,
+    delete_job, update_job_metadata, update_notes, update_interview_prep,
 )
 from storage.profile import load_profile, save_profile
 
@@ -1044,6 +1044,9 @@ elif page == "📁 My Applications":
                     # ── Interview Prep ────────────────────────────────────────
                     st.divider()
                     prep_key = f"interview_prep_{job['id']}"
+                    # Load from DB into session state on first open
+                    if prep_key not in st.session_state and job.get("interview_prep"):
+                        st.session_state[prep_key] = job["interview_prep"]
                     prep_desc = job.get("description", "").strip()
                     if not prep_desc:
                         st.caption("🎤 Interview prep requires a job description — open the job on Job Board and paste one first.")
@@ -1083,6 +1086,7 @@ elif page == "📁 My Applications":
                                         max_tokens=3000,
                                     )
                                     st.session_state[prep_key] = prep_text
+                                    update_interview_prep(job["id"], prep_text)
                                 except Exception as e:
                                     st.error(f"Interview prep failed: {e}")
 
@@ -1120,6 +1124,7 @@ elif page == "📁 My Applications":
                                 )
                                 if clr_col.button("Clear", key=f"prep_clear_{job['id']}"):
                                     del st.session_state[prep_key]
+                                    update_interview_prep(job["id"], "")
                                     st.rerun()
 
 
