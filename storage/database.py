@@ -40,6 +40,7 @@ def init_db():
     for col, definition in [
         ("score", "INTEGER"), ("score_reason", "TEXT"), ("scored_at", "TEXT"),
         ("applied_at", "TEXT"), ("company_context", "TEXT"), ("notes", "TEXT"), ("interview_prep", "TEXT"),
+        ("matched_skills", "TEXT"), ("missing_skills", "TEXT"), ("suggested_keywords", "TEXT"),
     ]:
         try:
             conn.execute(f"ALTER TABLE jobs ADD COLUMN {col} {definition}")
@@ -154,12 +155,22 @@ def get_all_jobs(status: Optional[str] = None, remote: Optional[bool] = None,
     return [dict(r) for r in rows]
 
 
-def save_score(job_id: int, score: int, reason: str):
+def save_score(job_id: int, score: int, reason: str,
+               matched_skills: list = None, missing_skills: list = None,
+               suggested_keywords: list = None):
+    import json
     from datetime import datetime
     conn = get_connection()
     conn.execute(
-        "UPDATE jobs SET score=?, score_reason=?, scored_at=? WHERE id=?",
-        (score, reason, datetime.now().isoformat(), job_id),
+        "UPDATE jobs SET score=?, score_reason=?, scored_at=?, "
+        "matched_skills=?, missing_skills=?, suggested_keywords=? WHERE id=?",
+        (
+            score, reason, datetime.now().isoformat(),
+            json.dumps(matched_skills or []),
+            json.dumps(missing_skills or []),
+            json.dumps(suggested_keywords or []),
+            job_id,
+        ),
     )
     conn.commit()
     conn.close()

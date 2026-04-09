@@ -106,7 +106,45 @@ def render():
                 c1, c2 = st.columns([2, 1])
                 with c1:
                     if job.get("score_reason"):
-                        st.markdown(f"**AI Analysis:** {job['score_reason']}")
+                        import json as _json
+                        _highlights = job["score_reason"].split(" | ")[0]
+                        st.markdown(f"**AI Analysis:** {_highlights}")
+
+                        def _parse_skills(col):
+                            raw = job.get(col)
+                            if not raw:
+                                return []
+                            try:
+                                return _json.loads(raw)
+                            except Exception:
+                                return []
+
+                        _matched  = _parse_skills("matched_skills")
+                        _missing  = _parse_skills("missing_skills")
+                        _keywords = _parse_skills("suggested_keywords")
+
+                        if _matched or _missing or _keywords:
+                            def _chips(items, color):
+                                return " ".join(
+                                    f'<span style="background:{color}22;color:{color};'
+                                    f'padding:1px 8px;border-radius:99px;font-size:0.78rem;'
+                                    f'margin:2px;display:inline-block;">{s}</span>'
+                                    for s in items
+                                )
+                            parts = []
+                            if _matched:
+                                parts.append(f"✅ &nbsp;{_chips(_matched, '#22c55e')}")
+                            if _missing:
+                                parts.append(f"❌ &nbsp;{_chips(_missing, '#ef4444')}")
+                            if _keywords:
+                                parts.append(f"💡 &nbsp;{_chips(_keywords, '#f59e0b')}")
+                            st.markdown(
+                                "<div style='margin:6px 0 10px 0;line-height:2;'>"
+                                + "<br>".join(parts)
+                                + "</div>",
+                                unsafe_allow_html=True,
+                            )
+
                     desc = (job.get("description") or "No description available.")
                     st.markdown(f"**Description:**\n\n{desc[:1500]}{'…' if len(desc) > 1500 else ''}")
                 with c2:

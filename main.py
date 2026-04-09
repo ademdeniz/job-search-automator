@@ -185,7 +185,12 @@ def cmd_score(args):
             f"gaps: {', '.join(result.missing_skills[:5])} | "
             f"keywords: {', '.join(result.suggested_keywords)}"
         )
-        save_score(job_id, result.score, reason)
+        save_score(
+            job_id, result.score, reason,
+            matched_skills=result.matched_skills,
+            missing_skills=result.missing_skills,
+            suggested_keywords=result.suggested_keywords,
+        )
         saved += 1
 
     print(f"\nDone. Scored {saved}/{len(jobs)} job(s).")
