@@ -901,6 +901,31 @@ elif page == "📁 My Applications":
                         placeholder="e.g. Phone screen with Sarah on Apr 10, asked about Appium experience…",
                     )
 
+                    # ── Add to Google Calendar ────────────────────────────────
+                    st.markdown("**Schedule Interview**")
+                    cal_c1, cal_c2, cal_c3 = st.columns([1.2, 1, 1])
+                    with cal_c1:
+                        cal_date = st.date_input("Date", key=f"cal_date_{job['id']}", label_visibility="collapsed")
+                    with cal_c2:
+                        cal_time = st.time_input("Time", key=f"cal_time_{job['id']}", label_visibility="collapsed", step=900)
+                    with cal_c3:
+                        cal_dur = st.selectbox("Duration", ["30 min", "45 min", "60 min", "90 min"], key=f"cal_dur_{job['id']}", label_visibility="collapsed")
+
+                    from datetime import datetime, timedelta
+                    from urllib.parse import urlencode
+                    _dur_map = {"30 min": 30, "45 min": 45, "60 min": 60, "90 min": 90}
+                    _start = datetime.combine(cal_date, cal_time)
+                    _end   = _start + timedelta(minutes=_dur_map[cal_dur])
+                    _fmt   = "%Y%m%dT%H%M%S"
+                    _gc_params = urlencode({
+                        "action": "TEMPLATE",
+                        "text": f"Interview — {job['title']} @ {job['company']}",
+                        "dates": f"{_start.strftime(_fmt)}/{_end.strftime(_fmt)}",
+                        "details": f"Job ID: {job['id']}\n{job.get('url', '')}",
+                    })
+                    _gc_url = f"https://calendar.google.com/calendar/render?{_gc_params}"
+                    st.link_button("📅 Add to Google Calendar", _gc_url)
+
 
 # ════════════════════════════════════════════════════════════════════════════
 # PAGE: PROFILE
