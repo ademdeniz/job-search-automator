@@ -23,7 +23,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 from storage.database import (
     get_all_jobs, get_job_by_id, update_status, save_score,
     get_unscored_jobs, get_jobs_without_description, stats, get_applied_jobs,
-    delete_job, update_job_metadata,
+    delete_job, update_job_metadata, update_notes,
 )
 from storage.profile import load_profile, save_profile
 
@@ -152,7 +152,8 @@ def score_badge(score):
     return f"{colors[level]} {score}/100"
 
 
-def run_cli(cmd: list[str]) -> str:
+def run_cli(cmd: list[str]) -> tuple[str, bool]:
+    """Run a CLI command. Returns (output, success)."""
     env = os.environ.copy()
     # Load API key from ~/.zshrc if not already in environment
     if not env.get("ANTHROPIC_API_KEY"):
@@ -165,13 +166,31 @@ def run_cli(cmd: list[str]) -> str:
                         break
         except Exception:
             pass
-    result = subprocess.run(
-        [sys.executable] + cmd,
-        capture_output=True, text=True,
-        cwd=os.path.dirname(__file__),
-        env=env,
-    )
-    return (result.stdout + result.stderr).strip()
+    try:
+        result = subprocess.run(
+            [sys.executable] + cmd,
+            capture_output=True, text=True,
+            cwd=os.path.dirname(__file__),
+            env=env,
+            timeout=600,
+        )
+        out = (result.stdout + result.stderr).strip()
+        # Detect failure: non-zero exit code OR output contains known error signals
+        _error_signals = ["Traceback (most recent call last)", "Error code:", "credit balance", "FileNotFoundError", "ModuleNotFoundError"]
+        failed = result.returncode != 0 or any(s in out for s in _error_signals)
+        return out, not failed
+    except subprocess.TimeoutExpired:
+        return "Operation timed out after 10 minutes.", False
+    except Exception as e:
+        return f"Failed to run command: {e}", False
+
+
+def _show_cli_result(out: str, success: bool):
+    """Display CLI output — error box if failed, code block if success."""
+    if not success:
+        st.error(f"Something went wrong:\n\n```\n{out}\n```")
+    elif out:
+        st.code(out)
 
 
 # ── sidebar ───────────────────────────────────────────────────────────────────
@@ -406,29 +425,28 @@ if page == "📋 Job Board":
                         # If user provided a real company name, temporarily patch the job
                         # by prepending it to the description so Claude sees it
                         override = st.session_state.get(company_override_key, "").strip()
-                        if override:
-                            run_cli(["main.py", "tailor", str(job["id"]), "--company", override])
-                            spinner_company = override
-                        else:
-                            spinner_company = job["company"]
+                        spinner_company = override if override else job["company"]
 
                         with st.spinner("Claude is tailoring your resume… (30–60 sec)"):
-                            out = run_cli(["main.py", "tailor", str(job["id"])]
+                            out, ok = run_cli(["main.py", "tailor", str(job["id"])]
                                          + (["--company", override] if override else []))
 
-                        # Parse file paths and real company from CLI output
-                        import re as _re
-                        resume_match  = _re.search(r"Resume:\s+(.+\.docx)", out)
-                        cl_match      = _re.search(r"Cover letter:\s+(.+\.docx)", out)
-                        company_match = _re.search(r"Real company identified:\s+(.+?)\s+\(was:", out)
-                        real_company  = company_match.group(1).strip() if company_match else job["company"]
-                        key = f"tailor_files_{job['id']}"
-                        st.session_state[key] = {
-                            "resume": resume_match.group(1).strip() if resume_match else None,
-                            "cover_letter": cl_match.group(1).strip() if cl_match else None,
-                            "company": real_company,
-                            "log": out,
-                        }
+                        if not ok:
+                            st.error(f"Tailoring failed:\n\n```\n{out}\n```")
+                        else:
+                            # Parse file paths and real company from CLI output
+                            import re as _re
+                            resume_match  = _re.search(r"Resume:\s+(.+\.docx)", out)
+                            cl_match      = _re.search(r"Cover letter:\s+(.+\.docx)", out)
+                            company_match = _re.search(r"Real company identified:\s+(.+?)\s+\(was:", out)
+                            real_company  = company_match.group(1).strip() if company_match else job["company"]
+                            key = f"tailor_files_{job['id']}"
+                            st.session_state[key] = {
+                                "resume": resume_match.group(1).strip() if resume_match else None,
+                                "cover_letter": cl_match.group(1).strip() if cl_match else None,
+                                "company": real_company,
+                                "log": out,
+                            }
 
                     # ── Show downloads from session state (persists across rerenders) ──
                     state_key = f"tailor_files_{job['id']}"
@@ -638,7 +656,7 @@ elif page == "🔧 Actions":
                 # ── optional clear ────────────────────────────────────────
                 if fresh_search:
                     with st.spinner("Clearing database…"):
-                        out = run_cli(["main.py", "clear"])
+                        out, _ = run_cli(["main.py", "clear"])
                     output_lines.append(out)
 
                 # Strip separators (|, &, commas) so "SDET | QA | Appium" → ["SDET", "QA", "Appium"]
@@ -650,12 +668,14 @@ elif page == "🔧 Actions":
                 max_args = ["--max-results", str(max_results)]
                 days_args = ["--days-ago", str(days_ago)] if days_ago else []
 
+                scrape_errors = []
+
                 # ── remote pass ───────────────────────────────────────────
                 if location_mode in ("🇺🇸 US Remote only", "🌐 World Remote", "🔀 Both (US Remote + Local)"):
                     remote_location = "Remote US" if location_mode in ("🇺🇸 US Remote only", "🔀 Both (US Remote + Local)") else "Remote"
                     label = "US remote" if remote_location == "Remote US" else "worldwide remote"
                     with st.spinner(f"Scraping {label} jobs…"):
-                        out = run_cli(
+                        out, ok = run_cli(
                             ["main.py", "scrape"]
                             + kw_args
                             + ["--location", remote_location]
@@ -664,6 +684,8 @@ elif page == "🔧 Actions":
                             + days_args
                         )
                     output_lines.append(f"── Remote pass ({label}) ──\n" + out)
+                    if not ok:
+                        scrape_errors.append(f"Remote scrape failed: {out[:200]}")
 
                 # ── Local / hybrid pass ───────────────────────────────────
                 if location_mode in ("📍 Local / Hybrid", "🔀 Both (US Remote + Local)"):
@@ -672,7 +694,7 @@ elif page == "🔧 Actions":
                         output_lines.append("⚠️ Local pass skipped — enter a location above.")
                     elif local_sources:
                         with st.spinner(f"Scraping local / hybrid jobs near {local_location}…"):
-                            out = run_cli(
+                            out, ok = run_cli(
                                 ["main.py", "scrape"]
                                 + kw_args
                                 + ["--location", local_location.strip()]
@@ -681,9 +703,13 @@ elif page == "🔧 Actions":
                                 + days_args
                             )
                         output_lines.append(f"── Local pass ({local_location.strip()}) ──\n" + out)
+                        if not ok:
+                            scrape_errors.append(f"Local scrape failed: {out[:200]}")
                     else:
                         output_lines.append("⚠️ Local pass skipped — LinkedIn and/or Indeed must be selected.")
 
+                if scrape_errors:
+                    st.error("Scraping encountered errors:\n\n" + "\n\n".join(scrape_errors))
                 st.code("\n\n".join(output_lines))
 
                 # ── post-scrape summary — store in state so it survives reruns ──
@@ -703,8 +729,8 @@ elif page == "🔧 Actions":
         st.info(f"{len(no_desc_all)} job(s) missing descriptions — {summary}")
         if st.button("▶ Fetch Descriptions"):
             with st.spinner(f"Fetching {len(no_desc_all)} descriptions via headless browser… (this takes a few minutes)"):
-                out = run_cli(["main.py", "fetch"])
-            st.code(out)
+                out, ok = run_cli(["main.py", "fetch"])
+            _show_cli_result(out, ok)
             st.rerun()
 
     # ── score ─────────────────────────────────────────────────────────────────
@@ -718,12 +744,13 @@ elif page == "🔧 Actions":
             if rescore_all:
                 args.append("--all")
             with st.spinner("Scoring with Claude AI… (a few seconds per job)"):
-                out = run_cli(args)
-            st.session_state["last_score_output"] = out
+                out, ok = run_cli(args)
+            st.session_state["last_score_output"] = (out, ok)
             st.rerun()
 
     if "last_score_output" in st.session_state:
-        st.code(st.session_state["last_score_output"])
+        _s_out, _s_ok = st.session_state["last_score_output"]
+        _show_cli_result(_s_out, _s_ok)
         if st.button("Dismiss", key="dismiss_score_output"):
             del st.session_state["last_score_output"]
             st.rerun()
@@ -892,14 +919,18 @@ elif page == "📁 My Applications":
                             update_status(job["id"], correct_stage)
                             st.rerun()
 
-                    # Notes field stored in session state (lightweight, no DB change needed)
+                    # Notes — loaded from DB, saved on change
                     notes_key = f"notes_{job['id']}"
-                    st.text_area(
+                    if notes_key not in st.session_state:
+                        st.session_state[notes_key] = job.get("notes") or ""
+                    new_notes = st.text_area(
                         "Notes (interview prep, contacts, follow-up dates…)",
                         key=notes_key,
                         height=100,
                         placeholder="e.g. Phone screen with Sarah on Apr 10, asked about Appium experience…",
                     )
+                    if new_notes != (job.get("notes") or ""):
+                        update_notes(job["id"], new_notes)
 
                     # ── Add to Google Calendar ────────────────────────────────
                     st.markdown("**Schedule Interview**")
