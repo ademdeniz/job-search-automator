@@ -599,6 +599,86 @@ elif page == "📊 Dashboard":
                 })
             st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
 
+    # ── application analytics ─────────────────────────────────────────────────
+    st.divider()
+    st.subheader("📊 Application Analytics")
+
+    all_jobs = get_all_jobs()
+    applied_jobs  = [j for j in all_jobs if j["status"] in ("applied", "interviewing", "offer")]
+    got_response  = [j for j in all_jobs if j["status"] in ("interviewing", "offer")]
+    scored_applied = [j for j in applied_jobs if j.get("score") is not None]
+    scored_response = [j for j in got_response if j.get("score") is not None]
+
+    an1, an2, an3 = st.columns(3)
+
+    # Response rate overall
+    total_applied = len(applied_jobs)
+    total_response = len(got_response)
+    response_rate = round(total_response / total_applied * 100, 1) if total_applied else 0
+    an1.metric("Overall Response Rate", f"{response_rate}%", f"{total_response} of {total_applied} applications")
+
+    # Avg score of jobs that got a response vs. didn't
+    avg_resp  = round(sum(j["score"] for j in scored_response) / len(scored_response), 1) if scored_response else 0
+    no_resp   = [j for j in scored_applied if j["status"] == "applied"]
+    avg_noresp = round(sum(j["score"] for j in no_resp) / len(no_resp), 1) if no_resp else 0
+    an2.metric("Avg Score — Got Response", f"{avg_resp}/100")
+    an3.metric("Avg Score — No Response", f"{avg_noresp}/100")
+
+    st.markdown("")
+    ac1, ac2 = st.columns(2)
+
+    # ── Response rate by source ───────────────────────────────────────────────
+    with ac1:
+        st.markdown("**Response Rate by Source**")
+        source_applied  = {}
+        source_response = {}
+        for j in applied_jobs:
+            src = j.get("source") or "unknown"
+            source_applied[src]  = source_applied.get(src, 0) + 1
+        for j in got_response:
+            src = j.get("source") or "unknown"
+            source_response[src] = source_response.get(src, 0) + 1
+
+        if source_applied:
+            src_rows = []
+            for src, cnt in sorted(source_applied.items(), key=lambda x: -x[1]):
+                resp = source_response.get(src, 0)
+                rate = round(resp / cnt * 100, 1) if cnt else 0
+                src_rows.append({"Source": src, "Applied": cnt, "Response": resp, "Rate %": rate})
+            src_df = pd.DataFrame(src_rows)
+            st.dataframe(src_df, use_container_width=True, hide_index=True)
+        else:
+            st.info("No applications tracked yet.")
+
+    # ── Score distribution: responded vs not ─────────────────────────────────
+    with ac2:
+        st.markdown("**Score Distribution: Response vs No Response**")
+        if scored_response or no_resp:
+            import numpy as np
+            bins   = [0, 25, 50, 75, 90, 101]
+            labels = ["0-24", "25-49", "50-74", "75-89", "90+"]
+
+            def _bin_scores(jobs):
+                counts = {l: 0 for l in labels}
+                for j in jobs:
+                    s = j["score"]
+                    for i, (lo, hi) in enumerate(zip(bins, bins[1:])):
+                        if lo <= s < hi:
+                            counts[labels[i]] += 1
+                            break
+                return counts
+
+            resp_bins   = _bin_scores(scored_response)
+            noresp_bins = _bin_scores(no_resp)
+            dist_df = pd.DataFrame({
+                "Range":       labels,
+                "Got Response": [resp_bins[l] for l in labels],
+                "No Response":  [noresp_bins[l] for l in labels],
+            }).set_index("Range")
+            st.bar_chart(dist_df)
+        else:
+            st.info("Score more jobs to see distribution.")
+
 
 # ════════════════════════════════════════════════════════════════════════════
 # PAGE: ACTIONS
