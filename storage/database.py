@@ -50,12 +50,50 @@ def init_db():
     print("[DB] Database initialised.")
 
 
-def save_jobs(jobs: List[Job]) -> int:
-    """Insert jobs, skip duplicates (by URL). Returns count of newly inserted."""
+def _is_fuzzy_duplicate(conn: sqlite3.Connection, title: str, company: str) -> bool:
+    """Return True if a job with a very similar title+company already exists."""
+    # Normalise: lowercase, strip punctuation
+    import re
+    def _norm(s: str) -> str:
+        return re.sub(r"[^a-z0-9 ]", "", s.lower()).strip()
+
+    title_n   = _norm(title)
+    company_n = _norm(company)
+    if not title_n or not company_n:
+        return False
+
+    rows = conn.execute(
+        "SELECT title, company FROM jobs WHERE status NOT IN ('rejected')"
+    ).fetchall()
+    for row in rows:
+        rt = _norm(row["title"])
+        rc = _norm(row["company"])
+        # Same company (exact after normalise) + title overlap > 80%
+        if rc == company_n:
+            # Token overlap ratio
+            t_words  = set(title_n.split())
+            rt_words = set(rt.split())
+            if not t_words:
+                continue
+            overlap = len(t_words & rt_words) / len(t_words)
+            if overlap >= 0.8:
+                return True
+    return False
+
+
+def save_jobs(jobs: List[Job]) -> tuple:
+    """Insert jobs, skip duplicates (by URL or fuzzy title+company match).
+    Returns (inserted_count, fuzzy_skipped_count)."""
     conn = get_connection()
     inserted = 0
+    fuzzy_skipped = 0
     for job in jobs:
         try:
+            # URL-based dedup (hard constraint via UNIQUE index)
+            # Fuzzy dedup: skip if very similar title+company already exists
+            if _is_fuzzy_duplicate(conn, job.title, job.company):
+                fuzzy_skipped += 1
+                continue
             conn.execute("""
                 INSERT INTO jobs
                     (title, company, location, source, url, description,
@@ -72,7 +110,7 @@ def save_jobs(jobs: List[Job]) -> int:
             pass  # duplicate URL — skip
     conn.commit()
     conn.close()
-    return inserted
+    return inserted, fuzzy_skipped
 
 
 def update_status(job_id: int, status: str):

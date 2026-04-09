@@ -86,8 +86,10 @@ def cmd_scrape(args):
         print("No jobs found.")
         return
 
-    inserted = save_jobs(all_jobs)
-    print(f"\nDone. Saved {inserted} new job(s) (skipped {len(all_jobs) - inserted} duplicate(s)).")
+    inserted, fuzzy_skipped = save_jobs(all_jobs)
+    url_skipped = len(all_jobs) - inserted - fuzzy_skipped
+    print(f"\nDone. Saved {inserted} new job(s) "
+          f"(skipped {url_skipped} exact duplicate(s), {fuzzy_skipped} fuzzy duplicate(s)).")
     if inserted:
         print("Run  python main.py score  to rank them against your resume.")
 

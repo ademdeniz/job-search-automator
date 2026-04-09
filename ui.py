@@ -389,7 +389,7 @@ if page == "📋 Job Board":
                     paste_label = "Paste full job description (replaces scraped snippet)" if has_desc else "Paste job description"
                     paste_placeholder = "Copy the full job description from the job board and paste it here…"
                     if not has_desc:
-                        st.caption("No description — paste one below to enable tailoring.")
+                        st.warning("⚠️ No description yet — tailoring is disabled until you paste one below.")
                     manual_desc = st.text_area(
                         paste_label,
                         key=manual_key,
