@@ -26,7 +26,7 @@ def render():
     with col1:
         keyword = st.text_input("🔍 Search", placeholder="title, company, description…")
     with col2:
-        filter_status = st.selectbox("Status", ["New only", "All"] + VALID_STATUSES)
+        filter_status = st.selectbox("Status", ["New only", "All"])
     with col3:
         filter_source = st.selectbox("Source", ["All"] + SOURCES)
     with col4:
@@ -36,12 +36,7 @@ def render():
 
     sort_by = st.radio("Sort by", ["Score ↓", "Date ↓"], horizontal=True)
 
-    if filter_status == "New only":
-        status_filter = "new"
-    elif filter_status == "All":
-        status_filter = None
-    else:
-        status_filter = filter_status
+    status_filter = "new" if filter_status == "New only" else None
 
     jobs = get_all_jobs(
         status=status_filter,
@@ -49,6 +44,11 @@ def render():
         keyword=keyword or None,
         remote=True if remote_only else None,
     )
+
+    # Always exclude pipeline and rejected jobs — they live in My Applications
+    _excluded = {"applied", "interviewing", "offer", "rejected"}
+    if status_filter is None:
+        jobs = [j for j in jobs if j["status"] not in _excluded]
 
     if min_score > 0:
         jobs = [j for j in jobs if (j.get("score") or 0) >= min_score]
