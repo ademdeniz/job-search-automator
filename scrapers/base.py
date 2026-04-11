@@ -13,6 +13,7 @@ _GENERIC_WORDS = {
     "associate", "director", "head", "officer", "coordinator",
     "automation", "digital", "technology", "solutions", "systems",
     "platform", "ai", "data", "software", "technical",
+    "mobile", "web", "cloud", "it",
 }
 
 # Non-US place names — if any appear in a job's location we exclude it in US-only mode.
@@ -64,9 +65,9 @@ class BaseScraper(ABC):
     def _title_matches_keywords(self, title: str) -> bool:
         """
         Return True if the job title contains at least one meaningful user keyword.
-        Uses word-boundary matching for short terms (≤4 chars) to avoid false positives
-        like 'qa' matching inside 'icqa'. Generic words like 'engineer' are skipped
-        unless they're the only keyword supplied.
+        Uses word-boundary matching for all terms to avoid false positives like
+        'mobile' matching 'Mobile Inspector' or 'qa' matching 'icqa'.
+        Generic words like 'engineer' are skipped unless they're the only keyword supplied.
         """
         t = title.lower()
         meaningful = [kw for kw in self.keywords if kw.lower() not in _GENERIC_WORDS]
@@ -74,12 +75,8 @@ class BaseScraper(ABC):
         candidates = meaningful if meaningful else self.keywords
         for kw in candidates:
             kw_l = kw.lower()
-            if len(kw_l) <= 4:
-                if _re.search(r'\b' + _re.escape(kw_l) + r'\b', t):
-                    return True
-            else:
-                if kw_l in t:
-                    return True
+            if _re.search(r'\b' + _re.escape(kw_l) + r'\b', t):
+                return True
         return False
 
     @abstractmethod
