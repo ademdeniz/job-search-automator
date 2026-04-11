@@ -30,7 +30,7 @@ def render():
     with col3:
         filter_source = st.selectbox("Source", ["All"] + SOURCES)
     with col4:
-        min_score = st.slider("Min Score", 0, 100, 0, step=5)
+        min_score = st.slider("Min Score", 0, 100, 40, step=5)
     with col5:
         remote_only = st.checkbox("Remote only")
 
@@ -51,14 +51,28 @@ def render():
         jobs = [j for j in jobs if j["status"] not in _excluded]
 
     if min_score > 0:
-        jobs = [j for j in jobs if (j.get("score") or 0) >= min_score]
+        # Keep unscored jobs (no description yet) — hide only scored jobs below threshold
+        jobs = [j for j in jobs if j.get("score") is None or j["score"] >= min_score]
     if sort_by == "Score ↓":
         jobs.sort(key=lambda j: (j.get("score") or -1), reverse=True)
 
-    st.caption(f"{len(jobs)} job(s) found — applied jobs are in 📁 My Applications")
+    scored_count   = sum(1 for j in jobs if j.get("score") is not None)
+    unscored_count = len(jobs) - scored_count
+    caption_parts  = []
+    if scored_count:
+        caption_parts.append(f"{scored_count} scored match(es)")
+    if unscored_count:
+        caption_parts.append(f"{unscored_count} not yet scored")
+    st.caption(", ".join(caption_parts) + " — applied jobs are in 📁 My Applications" if caption_parts else "")
 
     if not jobs:
-        st.info("No new jobs found. Scrape more from the Actions tab — your applied jobs are safe in 📁 My Applications.")
+        if min_score > 0:
+            st.warning(
+                f"No jobs scored {min_score}+ found. "
+                f"Try lowering the **Min Score** filter, or scrape again with different keywords."
+            )
+        else:
+            st.info("Nothing here yet. Scrape jobs from the **Actions** tab to get started.")
         st.stop()
 
     # ── job cards ─────────────────────────────────────────────────────────────
