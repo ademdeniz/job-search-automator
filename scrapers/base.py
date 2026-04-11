@@ -13,7 +13,6 @@ _GENERIC_WORDS = {
     "associate", "director", "head", "officer", "coordinator",
     "automation", "digital", "technology", "solutions", "systems",
     "platform", "ai", "data", "software", "technical",
-    "mobile", "web", "cloud", "it",
 }
 
 # Non-US place names — if any appear in a job's location we exclude it in US-only mode.

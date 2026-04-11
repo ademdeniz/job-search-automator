@@ -26,8 +26,12 @@ def render():
         p_target_role = st.text_input(
             "Target role / keywords",
             value=profile.get("target_role", ""),
-            placeholder="e.g. software engineer Python React  /  UX designer Figma  /  HR business partner",
-            help="Used as the default search keywords when scraping jobs.",
+            placeholder="e.g. SDET Appium  /  UX Figma  /  HR recruiter",
+            help=(
+                "Used as default search keywords when scraping. "
+                "Use specific terms, not a full job title — each word is matched independently. "
+                "Tip: 2-4 precise terms work better than a long phrase."
+            ),
         )
     with c2:
         p_linkedin = st.text_input("LinkedIn URL", value=profile.get("linkedin", ""),

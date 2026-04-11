@@ -36,7 +36,11 @@ def render():
             keywords_input = st.text_input(
                 "Keywords",
                 key="scrape_keywords",
-                help="Space-separated keywords — set your default in the Profile page.",
+                help=(
+                    "Specific search terms, space-separated. Each word is matched independently "
+                    "against job titles — keep them precise. "
+                    "Good: 'SDET QA Appium'. Too broad: 'Mobile Engineer Software'."
+                ),
             )
             location_mode = st.radio(
                 "Location mode",
