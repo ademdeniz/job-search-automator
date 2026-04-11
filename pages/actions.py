@@ -17,8 +17,8 @@ def render():
     if "last_scrape_count" in st.session_state:
         count = st.session_state["last_scrape_count"]
         st.success(
-            f"Done! Found **{count} new job(s)** in the database. "
-            f"Go to **📋 Job Board** to review and start applying."
+            f"Done! Found **{count} new job(s)** — scraped and scored. "
+            f"Go to **📋 Job Board** to review your matches."
         )
         if st.button("Dismiss", key="dismiss_scrape_banner"):
             del st.session_state["last_scrape_count"]
@@ -136,6 +136,16 @@ def render():
                 if scrape_errors:
                     st.error("Scraping encountered errors:\n\n" + "\n\n".join(scrape_errors))
                 st.code("\n\n".join(output_lines))
+
+                # ── auto-score newly scraped jobs ─────────────────────────────
+                unscored = get_unscored_jobs()
+                if unscored:
+                    with st.spinner(f"Scoring {len(unscored)} new job(s) with Claude AI…"):
+                        score_out, score_ok = run_cli(["main.py", "score"])
+                    if score_ok:
+                        st.success(f"Scored {len(unscored)} job(s) automatically.")
+                    else:
+                        st.warning(f"Auto-scoring failed — you can score manually below.\n\n```\n{score_out}\n```")
 
                 new_jobs = get_all_jobs(status="new")
                 st.session_state["last_scrape_count"] = len(new_jobs)
