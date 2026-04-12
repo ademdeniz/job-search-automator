@@ -115,7 +115,7 @@ def render():
                         )
                     output_lines.append(f"── Remote pass ({label}) ──\n" + out)
                     if not ok:
-                        scrape_errors.append(f"Remote scrape failed: {out[:200]}")
+                        scrape_errors.append(f"Remote scrape failed — see output below.")
 
                 if location_mode in ("📍 Local / Hybrid", "🔀 Both (US Remote + Local)"):
                     local_sources = [s for s in ERIE_SOURCES if s in sources_input]
@@ -133,7 +133,7 @@ def render():
                             )
                         output_lines.append(f"── Local pass ({local_location.strip()}) ──\n" + out)
                         if not ok:
-                            scrape_errors.append(f"Local scrape failed: {out[:200]}")
+                            scrape_errors.append(f"Local scrape failed — see output below.")
                     else:
                         output_lines.append("⚠️ Local pass skipped — LinkedIn and/or Indeed must be selected.")
 

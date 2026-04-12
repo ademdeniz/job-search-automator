@@ -153,7 +153,13 @@ def run_cli(cmd: list) -> tuple:
         out = (result.stdout + result.stderr).strip()
         _error_signals = ["Traceback (most recent call last)", "Error code:", "credit balance",
                           "FileNotFoundError", "ModuleNotFoundError"]
-        failed = result.returncode != 0 or any(s in out for s in _error_signals)
+        # Strip known harmless warnings before checking for error signals
+        _noise = ["NotOpenSSLWarning", "urllib3", "InsecureRequestWarning", "DeprecationWarning"]
+        out_clean = "\n".join(
+            line for line in out.splitlines()
+            if not any(n in line for n in _noise)
+        )
+        failed = result.returncode != 0 or any(s in out_clean for s in _error_signals)
         return out, not failed
     except subprocess.TimeoutExpired:
         return "Operation timed out after 10 minutes.", False
