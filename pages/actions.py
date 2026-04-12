@@ -141,14 +141,21 @@ def render():
                     st.error("Scraping encountered errors:\n\n" + "\n\n".join(scrape_errors))
                 st.code("\n\n".join(output_lines))
 
-                # ── auto-score newly scraped jobs ─────────────────────────────
+                # ── auto-fetch descriptions (LinkedIn, Indeed, Dice need this) ──
+                from scrapers.linkedin import _SUPPORTED_SOURCES
+                no_desc = [j for j in get_jobs_without_description() if j.get("source") in _SUPPORTED_SOURCES]
+                if no_desc:
+                    with st.spinner(f"Fetching descriptions for {len(no_desc)} job(s)… (headless browser)"):
+                        fetch_out, fetch_ok = run_cli(["main.py", "fetch"])
+                    if not fetch_ok:
+                        st.warning(f"Description fetch had issues — some jobs may not be scored.\n\n```\n{fetch_out}\n```")
+
+                # ── auto-score all jobs that now have descriptions ────────────
                 unscored = get_unscored_jobs()
                 if unscored:
-                    with st.spinner(f"Scoring {len(unscored)} new job(s) with Claude AI…"):
+                    with st.spinner(f"Scoring {len(unscored)} job(s) with Claude AI…"):
                         score_out, score_ok = run_cli(["main.py", "score"])
-                    if score_ok:
-                        st.success(f"Scored {len(unscored)} job(s) automatically.")
-                    else:
+                    if not score_ok:
                         st.warning(f"Auto-scoring failed — you can score manually below.\n\n```\n{score_out}\n```")
 
                 new_jobs = get_all_jobs(status="new")
