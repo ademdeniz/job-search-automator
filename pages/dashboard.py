@@ -1,8 +1,10 @@
 # Copyright (c) 2026 Adem Garic. All rights reserved.
 # Unauthorized use, copying, or distribution is prohibited. See LICENSE.
+import json
 import streamlit as st
 import pandas as pd
-from storage.database import get_all_jobs, stats
+from storage.database import get_all_jobs, stats, get_rejected_jobs
+from pages.utils import claude_call
 
 
 def render():
@@ -159,3 +161,75 @@ def render():
             st.bar_chart(dist_df)
         else:
             st.info("Score more jobs to see distribution.")
+
+    # ── rejection pattern analysis ────────────────────────────────────────────
+    st.divider()
+    st.subheader("🔍 Rejection Pattern Analysis")
+    st.caption("Claude analyzes your rejected applications to find patterns and gaps.")
+
+    rejected = get_rejected_jobs()
+    _coach_key = "rejection_coaching"
+
+    if len(rejected) < 3:
+        st.info("Mark at least 3 scored jobs as **rejected** to unlock pattern analysis.")
+    else:
+        st.caption(f"{len(rejected)} rejected application(s) available for analysis.")
+        if st.button("🔍 Analyze My Rejections", type="primary"):
+            # Build a compact summary for Claude
+            missing_counter: dict = {}
+            source_counter:  dict = {}
+            scores = []
+            for j in rejected:
+                scores.append(j.get("score") or 0)
+                source_counter[j.get("source", "unknown")] = source_counter.get(j.get("source", "unknown"), 0) + 1
+                try:
+                    skills = json.loads(j.get("missing_skills") or "[]")
+                    for s in skills:
+                        missing_counter[s] = missing_counter.get(s, 0) + 1
+                except Exception:
+                    pass
+
+            top_missing = sorted(missing_counter.items(), key=lambda x: -x[1])[:10]
+            top_sources = sorted(source_counter.items(), key=lambda x: -x[1])
+            avg_score   = round(sum(scores) / len(scores), 1) if scores else 0
+
+            sample_jobs = "\n".join(
+                f"- {j.get('title')} @ {j.get('company')} (score {j.get('score')}, source {j.get('source')})"
+                for j in rejected[:15]
+            )
+
+            with st.spinner("Claude is analyzing your rejection patterns…"):
+                try:
+                    coaching = claude_call(
+                        system=(
+                            "You are a career coach analyzing why a job candidate is getting rejected. "
+                            "Based on the data provided, identify 3-5 concrete, actionable patterns. "
+                            "Be specific and honest — generic advice is useless. "
+                            "Return a short markdown report with these sections:\n"
+                            "### Key Patterns\n"
+                            "### Top Skill Gaps\n"
+                            "### What to Do Next\n"
+                            "Keep the whole report under 300 words."
+                        ),
+                        user=(
+                            f"Rejected applications: {len(rejected)}\n"
+                            f"Average score of rejected jobs: {avg_score}/100\n"
+                            f"Score range: {min(scores)}-{max(scores)}\n\n"
+                            f"Top missing skills (skill: count):\n"
+                            + "\n".join(f"  {s}: {n}" for s, n in top_missing) + "\n\n"
+                            f"Sources where rejections happened:\n"
+                            + "\n".join(f"  {s}: {n}" for s, n in top_sources) + "\n\n"
+                            f"Sample rejected jobs:\n{sample_jobs}"
+                        ),
+                        model="claude-haiku-4-5-20251001",
+                        max_tokens=600,
+                    )
+                    st.session_state[_coach_key] = coaching
+                except Exception as e:
+                    st.error(f"Analysis failed: {e}")
+
+        if _coach_key in st.session_state:
+            st.markdown(st.session_state[_coach_key])
+            if st.button("Clear", key="clear_coaching"):
+                del st.session_state[_coach_key]
+                st.rerun()

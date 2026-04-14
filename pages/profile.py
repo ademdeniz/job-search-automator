@@ -10,6 +10,7 @@ def render():
 
     profile = load_profile()
 
+    # ── contact info ──────────────────────────────────────────────────────────
     st.subheader("Contact Info")
     c1, c2 = st.columns(2)
     with c1:
@@ -41,17 +42,75 @@ def render():
         p_website  = st.text_input("Website / Portfolio", value=profile.get("website", ""),
                                    placeholder="yourportfolio.com (optional)")
 
+    # ── resume slots ──────────────────────────────────────────────────────────
     st.divider()
     st.subheader("Resume")
-    st.caption("Paste your full resume as plain text. This is what Claude uses for tailoring.")
+    st.caption(
+        "Maintain multiple resume versions for different role types — "
+        "e.g. *Senior IC*, *Manager track*, *Startup*. "
+        "The **active slot** is what Claude uses for scoring and tailoring."
+    )
+
+    resumes = profile.get("resumes", {})
+    active  = profile.get("active_resume", "")
+    slots   = list(resumes.keys())
+
+    # ── slot selector + add ───────────────────────────────────────────────────
+    sl1, sl2, sl3 = st.columns([3, 2, 1])
+    with sl1:
+        selected_slot = st.selectbox(
+            "Active slot",
+            slots,
+            index=slots.index(active) if active in slots else 0,
+            key="slot_select",
+        )
+    with sl2:
+        new_slot_name = st.text_input(
+            "New slot name",
+            placeholder="e.g. Senior IC",
+            label_visibility="collapsed",
+            key="new_slot_name",
+        )
+    with sl3:
+        if st.button("➕ Add slot", use_container_width=True, key="add_slot_btn"):
+            name = new_slot_name.strip()
+            if name and name not in resumes:
+                resumes[name] = ""
+                profile["resumes"] = resumes
+                profile["active_resume"] = name
+                profile["resume"] = ""
+                save_profile(profile)
+                st.rerun()
+            elif name in resumes:
+                st.warning(f"Slot '{name}' already exists.")
+
+    # ── switch active slot ────────────────────────────────────────────────────
+    if selected_slot != active:
+        profile["active_resume"] = selected_slot
+        profile["resume"] = resumes.get(selected_slot, "")
+        save_profile(profile)
+        st.rerun()
+
+    # ── delete slot (only if more than one) ───────────────────────────────────
+    if len(slots) > 1:
+        if st.button(f"🗑 Delete '{selected_slot}'", key="delete_slot_btn"):
+            del resumes[selected_slot]
+            profile["resumes"] = resumes
+            profile["active_resume"] = next(iter(resumes))
+            profile["resume"] = resumes[profile["active_resume"]]
+            save_profile(profile)
+            st.rerun()
+
+    # ── resume text area for active slot ──────────────────────────────────────
     p_resume = st.text_area(
-        "Resume text",
-        value=profile.get("resume", ""),
+        f"Resume — {selected_slot}",
+        value=resumes.get(selected_slot, ""),
         height=500,
         label_visibility="collapsed",
         placeholder="Paste your resume here…",
     )
 
+    # ── writing sample ────────────────────────────────────────────────────────
     st.divider()
     st.subheader("Writing Sample")
     st.caption(
@@ -67,9 +126,13 @@ def render():
         placeholder="Paste something you wrote naturally, not for a job application…",
     )
 
+    # ── save ──────────────────────────────────────────────────────────────────
     st.divider()
     if st.button("💾 Save Profile", type="primary"):
+        updated_resumes = dict(resumes)
+        updated_resumes[selected_slot] = p_resume.strip()
         save_profile({
+            **profile,
             "name":           p_name.strip(),
             "email":          p_email.strip(),
             "linkedin":       p_linkedin.strip(),
@@ -79,6 +142,8 @@ def render():
             "title":          p_title.strip(),
             "target_role":    p_target_role.strip(),
             "resume":         p_resume.strip(),
+            "resumes":        updated_resumes,
+            "active_resume":  selected_slot,
             "writing_sample": p_writing_sample.strip(),
         })
         st.toast("Profile saved!", icon="✅")

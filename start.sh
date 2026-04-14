@@ -115,4 +115,12 @@ fi
 echo -e "${GRN}All checks passed. Launching UI…${NC}"
 echo ""
 
+# ── background scheduler ──────────────────────────────────────────────────────
+python3 "$SCRIPT_DIR/scheduler.py" &
+SCHEDULER_PID=$!
+echo -e "${GRN}✔${NC}  Scheduler started (PID $SCHEDULER_PID)"
+
+# Kill scheduler when Streamlit exits
+trap "kill $SCHEDULER_PID 2>/dev/null" EXIT
+
 python3 -m streamlit run "$SCRIPT_DIR/ui.py"

@@ -3,9 +3,10 @@
 import re as _re
 import csv
 import io
+import os
 import streamlit as st
 from storage.database import get_all_jobs, get_unscored_jobs, get_jobs_without_description
-from storage.profile import load_profile
+from storage.profile import load_profile, save_profile
 from pages.utils import VALID_STATUSES, SOURCES, ERIE_SOURCES, run_cli, show_cli_result
 
 
@@ -231,6 +232,74 @@ def render():
         if st.button("Dismiss", key="dismiss_score_output"):
             del st.session_state["last_score_output"]
             st.rerun()
+
+    # ── scheduler ─────────────────────────────────────────────────────────────
+    with st.expander("⏰ Auto-Scrape Scheduler"):
+        st.markdown(
+            "Run the full scrape → fetch → score pipeline automatically in the background. "
+            "Get an email when high-score jobs appear."
+        )
+        _prof = load_profile()
+        _sched = _prof.get("scheduler", {})
+
+        sc1, sc2 = st.columns(2)
+        with sc1:
+            sched_enabled = st.toggle("Enable scheduler", value=bool(_sched.get("enabled")))
+            sched_interval = st.selectbox(
+                "Run every",
+                [2, 4, 6, 8, 12, 24],
+                index=[2, 4, 6, 8, 12, 24].index(int(_sched.get("interval_hours", 6))),
+                format_func=lambda h: f"{h} hours",
+            )
+            sched_min_score = st.slider(
+                "Notify when score ≥",
+                min_value=50, max_value=95, step=5,
+                value=int(_sched.get("min_score_alert", 70)),
+            )
+        with sc2:
+            st.markdown("**Email notifications** *(optional)*")
+            st.caption("Uses Gmail SMTP. Create an [App Password](https://myaccount.google.com/apppasswords) — not your real password.")
+            sched_smtp_from  = st.text_input("Your Gmail address", value=_sched.get("smtp_from", ""), placeholder="you@gmail.com")
+            sched_smtp_pass  = st.text_input("App password (16 chars)", value=_sched.get("smtp_password", ""), type="password", placeholder="xxxx xxxx xxxx xxxx")
+            sched_notify     = st.text_input("Send alerts to", value=_sched.get("notify_email", ""), placeholder="same as above, or another address")
+
+        if st.button("💾 Save Scheduler Settings"):
+            _prof["scheduler"] = {
+                "enabled":         sched_enabled,
+                "interval_hours":  sched_interval,
+                "min_score_alert": sched_min_score,
+                "smtp_from":       sched_smtp_from.strip(),
+                "smtp_password":   sched_smtp_pass.strip(),
+                "notify_email":    sched_notify.strip(),
+            }
+            save_profile(_prof)
+            st.toast("Scheduler settings saved!", icon="✅")
+
+        # Last run status
+        import json as _json
+        _state_path = os.path.join(os.path.dirname(__file__), "..", "scheduler_state.json")
+        if os.path.exists(_state_path):
+            try:
+                with open(_state_path) as _f:
+                    _state = _json.load(_f)
+                st.caption(
+                    f"Last run: **{_state.get('last_run', 'never')}** — "
+                    f"found {_state.get('last_found', 0)} high-score job(s)"
+                )
+            except Exception:
+                pass
+
+        if st.button("▶ Run Pipeline Now", help="Trigger scrape → fetch → score immediately"):
+            with st.spinner("Running full pipeline… (may take a few minutes)"):
+                _kw = _prof.get("target_role", "").strip()
+                if _kw:
+                    out1, ok1 = run_cli(["main.py", "scrape", "--keywords", _kw])
+                    out2, ok2 = run_cli(["main.py", "fetch"])
+                    out3, ok3 = run_cli(["main.py", "score"])
+                    combined  = "\n\n".join([out1, out2, out3])
+                    show_cli_result(combined, ok1 and ok2 and ok3)
+                else:
+                    st.warning("Set a Target Role in your Profile first.")
 
     # ── export ────────────────────────────────────────────────────────────────
     with st.expander("📤 Export to CSV"):

@@ -258,6 +258,17 @@ def get_unscored_jobs() -> List[dict]:
     return [dict(r) for r in rows]
 
 
+def get_rejected_jobs() -> List[dict]:
+    """Return rejected jobs that have been scored — used for pattern analysis."""
+    conn = get_connection()
+    rows = conn.execute(
+        "SELECT title, company, source, score, matched_skills, missing_skills, location "
+        "FROM jobs WHERE status='rejected' AND score IS NOT NULL ORDER BY scraped_at DESC LIMIT 60"
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
 def delete_job(job_id: int):
     """Permanently delete a single job by ID."""
     conn = get_connection()
