@@ -41,6 +41,8 @@ def init_db():
         ("score", "INTEGER"), ("score_reason", "TEXT"), ("scored_at", "TEXT"),
         ("applied_at", "TEXT"), ("company_context", "TEXT"), ("notes", "TEXT"), ("interview_prep", "TEXT"),
         ("matched_skills", "TEXT"), ("missing_skills", "TEXT"), ("suggested_keywords", "TEXT"),
+        ("salary_estimate", "TEXT"),
+        ("red_flags", "TEXT"), ("red_flag_level", "INTEGER"),
     ]:
         try:
             conn.execute(f"ALTER TABLE jobs ADD COLUMN {col} {definition}")
@@ -157,20 +159,35 @@ def get_all_jobs(status: Optional[str] = None, remote: Optional[bool] = None,
 
 def save_score(job_id: int, score: int, reason: str,
                matched_skills: list = None, missing_skills: list = None,
-               suggested_keywords: list = None):
+               suggested_keywords: list = None, salary_estimate: str = None):
     import json
     from datetime import datetime
     conn = get_connection()
+    sets = (
+        "score=?, score_reason=?, scored_at=?, "
+        "matched_skills=?, missing_skills=?, suggested_keywords=?"
+    )
+    params = [
+        score, reason, datetime.now().isoformat(),
+        json.dumps(matched_skills or []),
+        json.dumps(missing_skills or []),
+        json.dumps(suggested_keywords or []),
+    ]
+    if salary_estimate is not None:
+        sets += ", salary_estimate=?"
+        params.append(salary_estimate)
+    params.append(job_id)
+    conn.execute(f"UPDATE jobs SET {sets} WHERE id=?", params)
+    conn.commit()
+    conn.close()
+
+
+def save_company_signals(job_id: int, flags: list, level: int):
+    import json
+    conn = get_connection()
     conn.execute(
-        "UPDATE jobs SET score=?, score_reason=?, scored_at=?, "
-        "matched_skills=?, missing_skills=?, suggested_keywords=? WHERE id=?",
-        (
-            score, reason, datetime.now().isoformat(),
-            json.dumps(matched_skills or []),
-            json.dumps(missing_skills or []),
-            json.dumps(suggested_keywords or []),
-            job_id,
-        ),
+        "UPDATE jobs SET red_flags=?, red_flag_level=? WHERE id=?",
+        (json.dumps(flags), level, job_id),
     )
     conn.commit()
     conn.close()

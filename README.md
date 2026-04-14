@@ -14,7 +14,8 @@ Built with Python + Claude AI (Anthropic). Fully role-agnostic — works for any
 ## Features
 
 - **Scrape** jobs from 9 sources simultaneously: LinkedIn, Indeed, RemoteOK, WeWorkRemotely, Dice, Greenhouse, Lever, Himalayas, and Jobspresso
-- **Score** every job 0–100 against your resume using Claude AI — see matched skills, missing skills, and suggested keywords per job, colour-coded on every card
+- **Score** every job 0–100 against your resume using Claude AI — see matched skills, missing skills, and suggested keywords per job, colour-coded on every card. Includes an AI salary estimate when the job posting doesn't list one.
+- **Company red-flag signals** — one-click analysis per job: layoffs, Glassdoor rating, financial distress, executive churn. Powered by Claude Haiku, cached to DB so you only pay once per company.
 - **Tailor** your resume and cover letter per job using Claude Sonnet — fetches company context from their website, generates ready-to-send `.docx` and `.pdf` files
 - **Voice pass** — cover letter is rewritten to match your natural writing style using a sample you provide
 - **ATS validation** — checks generated resume for formatting issues that break ATS parsers
@@ -24,7 +25,7 @@ Built with Python + Claude AI (Anthropic). Fully role-agnostic — works for any
 - **Track** your full application pipeline: applied → interviewing → offer
 - **My Applications** — dedicated tracker with inline stage advancement, notes, and permanent removal
 - **Google Calendar integration** — one-click "Add to Calendar" for interview scheduling (no OAuth required)
-- **Interview prep generator** — Claude Sonnet generates 10 role-specific Q&As from the job description and your resume, downloadable as `.docx` or `.pdf`
+- **Interview prep generator** — Claude Sonnet generates 10 role-specific questions with difficulty rating (easy / medium / hard), a tailored answer using your real experience, and 2 follow-up questions per question. Downloadable as `.docx` or `.pdf`
 - **Follow-up email drafter** — auto-drafts a short, human-sounding follow-up for applications with no response after 7+ days
 - **Application analytics** — response rate by source, score distribution for responded vs. not, pipeline funnel
 - **Role-agnostic** — scorer and tailor adapt to any domain via your profile (title + target role)
@@ -155,12 +156,13 @@ Go to **Actions → Fetch Descriptions**. This visits each job URL with a headle
 > **If a description is still missing or truncated:** open the job card on the Job Board, click the job link to open the original posting, copy the full description, paste it into the **"Paste full job description"** field, and hit **Save Description**.
 
 ### 4. Score jobs
-Go to **Actions → Score Jobs**. Claude Haiku reads your resume and each job description and returns a 0–100 match score. Each job card then shows:
+Scoring runs **automatically after every scrape** — no manual step needed. Claude Haiku reads your resume and each job description and returns a 0–100 match score. Each job card then shows:
 - **✅ green chips** — skills from your resume that match the job
 - **❌ red chips** — skills the job wants that you're missing
 - **💡 amber chips** — keywords to weave into your resume or cover letter before applying
+- **Salary estimate** — AI-estimated range shown as `~$X - $Y (est.)` when the posting doesn't list one
 
-Jobs without a description are skipped — fetch or paste descriptions first.
+Jobs without a description are skipped — fetch or paste descriptions first. You can also trigger scoring manually from **Actions → Score Jobs**.
 
 ### 5. Review and decide
 On the **Job Board**, expand any card to see the full description, skill breakdown, and AI analysis. Use the status dropdown to mark jobs as `applied`, `rejected`, or leave them as `new`.
@@ -286,7 +288,8 @@ job-search-automator/
 │   └── jobspresso.py
 │
 ├── scorer/
-│   └── job_scorer.py     # Claude Haiku — batch scoring, skill matching, keyword suggestions
+│   ├── job_scorer.py     # Claude Haiku — batch scoring, skill matching, keyword suggestions, salary estimate
+│   └── company_signals.py # Claude Haiku — company health red-flag analysis (layoffs, Glassdoor, churn)
 │
 ├── tailor/
 │   └── resume_tailor.py  # Claude Sonnet — tailored resume + cover letter → .docx
@@ -327,16 +330,16 @@ job-search-automator/
 - [x] My Applications pipeline tracker (applied → interviewing → offer)
 - [x] Notes per application (persisted to DB)
 - [x] Google Calendar integration (zero-OAuth interview scheduling)
-- [x] Interview prep generator (role-specific Q&As → .docx + .pdf)
+- [x] Interview prep generator v2 — difficulty levels (easy/medium/hard), tailored answers, 2 follow-up questions per Q, .docx + .pdf download
 - [x] Follow-up email drafter (7+ days, no response)
 - [x] Application analytics (response rate by source, score distribution)
 - [x] Profile page — manage resume, contact info, writing sample from UI
 - [x] PDF output via LibreOffice (free, offline)
 - [x] CSV export
+- [x] Salary estimate — AI-estimated range injected at scoring time when posting doesn't list one
+- [x] Company red-flag signals — layoffs, Glassdoor, financial distress, churn (Claude Haiku, cached)
 - [ ] Auto-apply (LinkedIn Easy Apply + Greenhouse forms)
 - [ ] Email / push notifications for high-score new jobs
-- [ ] Salary data enrichment
-- [ ] Company red-flag signals (Glassdoor sentiment, layoff history)
 
 ---
 

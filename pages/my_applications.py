@@ -14,7 +14,7 @@ from storage.database import (
 from storage.profile import load_profile
 from pages.utils import (
     SCORE_COLOR, PIPELINE, PIPELINE_COLOR, match_level, score_badge, fmt_date, claude_call,
-    docx_to_pdf, has_libreoffice,
+    docx_to_pdf, has_libreoffice, render_company_signals,
 )
 
 NEXT_STAGE = {
@@ -127,11 +127,21 @@ def render():
                     desc = job.get("description") or "No description saved."
                     st.markdown(f"**Description:**\n\n{desc[:1000]}{'…' if len(desc) > 1000 else ''}")
                 with d2:
-                    st.markdown(f"**Salary:** {job.get('salary') or 'N/A'}")
+                    _sal = job.get("salary") or ""
+                    _est = job.get("salary_estimate") or ""
+                    if _sal:
+                        st.markdown(f"**Salary:** {_sal}")
+                    elif _est:
+                        st.markdown(f"**Salary:** ~{_est} *(est.)*")
+                    else:
+                        st.markdown("**Salary:** N/A")
                     st.markdown(f"**Posted:** {job.get('posted_date') or 'N/A'}")
                     st.markdown(f"**Remote:** {'Yes' if job.get('remote') else 'No'}")
                     if job.get("url"):
                         st.link_button("🔗 Open Job", job["url"])
+
+                    st.divider()
+                    render_company_signals(job)
 
                     st.divider()
                     # Stage corrector — lets you fix mistakes / go back
@@ -252,25 +262,28 @@ def render():
                         if st.button("🎤 Generate Interview Prep", key=f"prep_btn_{job['id']}"):
                             _profile = load_profile()
                             _resume  = _profile.get("resume", "").strip()
-                            with st.spinner("Claude is generating interview questions and answers…"):
+                            with st.spinner("Claude is generating interview prep…"):
                                 try:
-                                    prep_text = claude_call(
+                                    prep_raw = claude_call(
                                         system=(
-                                            "You are an expert technical interview coach. "
+                                            "You are an expert technical interview coach.\n"
                                             "Given a job description and the candidate's resume, generate the 10 most likely "
-                                            "interview questions for this specific role, along with a tailored answer for each "
-                                            "based on the candidate's real experience. "
-                                            "Format as:\n\n"
-                                            "**Q1: [Question]**\n"
-                                            "[Tailored answer using candidate's specific projects, metrics, and technologies]\n\n"
-                                            "**Q2: [Question]**\n"
-                                            "[Answer]\n\n"
-                                            "...and so on.\n\n"
+                                            "interview questions for this specific role.\n\n"
+                                            "Return ONLY valid JSON — no markdown fences, no extra text:\n"
+                                            '{"questions": [\n'
+                                            '  {\n'
+                                            '    "q": "<question text>",\n'
+                                            '    "difficulty": "<easy|medium|hard>",\n'
+                                            '    "answer": "<tailored answer using candidate\'s specific projects, metrics, and technologies — 3-5 sentences>",\n'
+                                            '    "follow_ups": ["<follow-up question 1>", "<follow-up question 2>"]\n'
+                                            '  }\n'
+                                            "]}\n\n"
                                             "Rules:\n"
                                             "- Questions must be specific to THIS role and company, not generic.\n"
                                             "- Answers must reference the candidate's actual experience — real project names, real numbers.\n"
-                                            "- Mix technical, behavioural, and situational questions.\n"
-                                            "- Answers should be 3-5 sentences — enough to speak confidently, not a wall of text.\n"
+                                            "- Mix technical (4), behavioural (3), and situational (3) questions.\n"
+                                            "- difficulty: easy=general/intro, medium=core technical, hard=deep-dive/system-design.\n"
+                                            "- 2 follow-up questions per question — what an interviewer would probe next.\n"
                                             "- Do not invent experience the candidate doesn't have."
                                         ),
                                         user=(
@@ -281,31 +294,83 @@ def render():
                                             f"## Candidate Resume\n{_resume[:3000]}"
                                         ),
                                         model="claude-sonnet-4-6",
-                                        max_tokens=3000,
+                                        max_tokens=4000,
                                     )
-                                    st.session_state[prep_key] = prep_text
-                                    update_interview_prep(job["id"], prep_text)
+                                    # Validate JSON — fall back to storing raw if parse fails
+                                    try:
+                                        import json as _json
+                                        _json.loads(prep_raw)
+                                    except Exception:
+                                        pass  # store as-is; display will fall back to markdown
+                                    st.session_state[prep_key] = prep_raw
+                                    update_interview_prep(job["id"], prep_raw)
                                 except Exception as e:
                                     st.error(f"Interview prep failed: {e}")
 
                         if prep_key in st.session_state:
+                            _prep_raw = st.session_state[prep_key]
+                            _fname_base = f"interview_prep_{job['company'].replace(' ','_')}_{job['title'].replace(' ','_')[:30]}"
+                            _doc = _Document()
+                            _doc.add_heading(f"Interview Prep — {job['title']} @ {job['company']}", level=1)
+
+                            # Try to parse as structured JSON (v2 format)
+                            _questions = None
+                            try:
+                                import json as _json
+                                _parsed = _json.loads(_prep_raw)
+                                _questions = _parsed.get("questions", [])
+                            except Exception:
+                                pass
+
+                            _DIFF_COLOR = {"easy": "#22c55e", "medium": "#f59e0b", "hard": "#ef4444"}
+
                             with st.expander("🎤 Interview Prep", expanded=True):
-                                st.markdown(st.session_state[prep_key])
-                                dl_col, clr_col = st.columns([2, 1])
-                                _doc = _Document()
-                                _doc.add_heading(f"Interview Prep — {job['title']} @ {job['company']}", level=1)
-                                for line in st.session_state[prep_key].splitlines():
-                                    line = line.strip()
-                                    if not line:
-                                        _doc.add_paragraph("")
-                                    elif line.startswith("**Q") and line.endswith("**"):
+                                if _questions:
+                                    for i, item in enumerate(_questions, 1):
+                                        diff  = item.get("difficulty", "medium")
+                                        color = _DIFF_COLOR.get(diff, "#94a3b8")
+                                        st.markdown(
+                                            f'<div style="margin-top:14px;">'
+                                            f'<span style="font-weight:600;font-size:1rem;color:#f1f5f9;">Q{i}: {item["q"]}</span>'
+                                            f'&nbsp;<span style="background:{color}22;color:{color};padding:1px 8px;'
+                                            f'border-radius:99px;font-size:0.75rem;">{diff}</span>'
+                                            f'</div>',
+                                            unsafe_allow_html=True,
+                                        )
+                                        st.markdown(item.get("answer", ""))
+                                        fups = item.get("follow_ups", [])
+                                        if fups:
+                                            st.caption("Follow-up questions the interviewer might ask:")
+                                            for fup in fups:
+                                                st.markdown(f"&nbsp;&nbsp;↳ *{fup}*")
+
+                                        # Add to docx
                                         p = _doc.add_paragraph()
-                                        run = p.add_run(line.strip("*"))
+                                        run = p.add_run(f"Q{i} [{diff.upper()}]: {item['q']}")
                                         run.bold = True
                                         run.font.size = _Pt(11)
-                                    else:
-                                        _doc.add_paragraph(line.lstrip("*").rstrip("*"))
-                                _fname_base = f"interview_prep_{job['company'].replace(' ','_')}_{job['title'].replace(' ','_')[:30]}"
+                                        _doc.add_paragraph(item.get("answer", ""))
+                                        if fups:
+                                            _doc.add_paragraph("Follow-ups:")
+                                            for fup in fups:
+                                                _doc.add_paragraph(f"  ↳ {fup}")
+                                        _doc.add_paragraph("")
+                                else:
+                                    # Fallback: render as plain markdown (old format)
+                                    st.markdown(_prep_raw)
+                                    for line in _prep_raw.splitlines():
+                                        line = line.strip()
+                                        if not line:
+                                            _doc.add_paragraph("")
+                                        elif line.startswith("**Q") and line.endswith("**"):
+                                            p = _doc.add_paragraph()
+                                            run = p.add_run(line.strip("*"))
+                                            run.bold = True
+                                            run.font.size = _Pt(11)
+                                        else:
+                                            _doc.add_paragraph(line.lstrip("*").rstrip("*"))
+
+                                dl_col, clr_col = st.columns([2, 1])
                                 _buf = io.BytesIO()
                                 _doc.save(_buf)
                                 _buf.seek(0)

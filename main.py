@@ -190,6 +190,7 @@ def cmd_score(args):
             matched_skills=result.matched_skills,
             missing_skills=result.missing_skills,
             suggested_keywords=result.suggested_keywords,
+            salary_estimate=result.salary_estimate,
         )
         saved += 1
 

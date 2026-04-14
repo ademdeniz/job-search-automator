@@ -205,6 +205,79 @@ def has_libreoffice() -> bool:
     return bool(shutil.which("soffice") or shutil.which("libreoffice"))
 
 
+# ── company signal display ────────────────────────────────────────────────────
+_FLAG_LEVEL = {
+    0: None,
+    1: ("#f59e0b", "⚠️ Minor concerns"),
+    2: ("#f97316", "⚠️ Some concerns"),
+    3: ("#ef4444", "🚨 Red flags"),
+}
+
+
+def render_company_signals(job: dict):
+    """
+    Render the company signals button + result inline.
+    Handles fetch, DB save, and display — call from any page expander.
+    """
+    import json as _json
+    from storage.database import save_company_signals as _save
+
+    job_id  = job["id"]
+    level   = job.get("red_flag_level")
+    flags   = []
+    summary = ""
+    if job.get("red_flags"):
+        try:
+            flags = _json.loads(job["red_flags"])
+        except Exception:
+            flags = []
+
+    btn_key    = f"signals_btn_{job_id}"
+    result_key = f"signals_result_{job_id}"
+
+    # Load cached result from session state if available
+    if result_key in st.session_state:
+        cached = st.session_state[result_key]
+        level, flags, summary = cached["level"], cached["flags"], cached["summary"]
+    elif level is not None and job.get("red_flags"):
+        summary = job.get("score_reason", "")  # not ideal, but summary isn't stored separately
+
+    if st.button("🔍 Analyze Company Signals", key=btn_key):
+        from scorer.company_signals import fetch_company_signals
+        with st.spinner(f"Checking {job['company']} for red flags…"):
+            try:
+                result = fetch_company_signals(
+                    company=job["company"],
+                    job_title=job.get("title", ""),
+                    location=job.get("location", ""),
+                )
+                _save(job_id, result["flags"], result["level"])
+                st.session_state[result_key] = result
+                level   = result["level"]
+                flags   = result["flags"]
+                summary = result["summary"]
+            except Exception as e:
+                st.error(f"Company signals failed: {e}")
+                return
+
+    if level is not None:
+        meta = _FLAG_LEVEL.get(level)
+        if meta is None:
+            st.success("✅ No notable company concerns found.")
+        else:
+            color, label = meta
+            st.markdown(
+                f'<span style="background:{color}22;color:{color};padding:3px 10px;'
+                f'border-radius:99px;font-size:0.82rem;font-weight:600;">{label}</span>',
+                unsafe_allow_html=True,
+            )
+            if flags:
+                for f in flags:
+                    st.markdown(f"• {f}")
+        if summary:
+            st.caption(summary)
+
+
 # ── direct Claude call ────────────────────────────────────────────────────────
 def claude_call(system: str, user: str, model: str = "claude-haiku-4-5-20251001", max_tokens: int = 2048) -> str:
     """Make a direct Claude API call. Returns response text or raises."""

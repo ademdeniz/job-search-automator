@@ -10,6 +10,7 @@ from storage.profile import load_profile
 from pages.utils import (
     VALID_STATUSES, SOURCES, SCORE_COLOR, STATUS_COLOR,
     match_level, score_badge, extract_metadata, run_cli, docx_to_pdf, has_libreoffice,
+    render_company_signals,
 )
 
 AGGREGATORS = {
@@ -75,12 +76,19 @@ def render():
             st.info("Nothing here yet. Scrape jobs from the **Actions** tab to get started.")
         st.stop()
 
+    _FLAG_CHIP = {
+        1: ("#f59e0b", "⚠️"),
+        2: ("#f97316", "⚠️"),
+        3: ("#ef4444", "🚨"),
+    }
+
     # ── job cards ─────────────────────────────────────────────────────────────
     for job in jobs:
         score = job.get("score")
         level = match_level(score)
         border_color = SCORE_COLOR.get(level, "#94a3b8")
         status_color = STATUS_COLOR.get(job["status"], "#94a3b8")
+        flag_level   = job.get("red_flag_level")
 
         with st.container():
             st.markdown(
@@ -106,12 +114,8 @@ def render():
                                          padding:2px 10px; border-radius:99px; font-size:0.8rem;">
                                 {job['status']}
                             </span>
-                            <span style="color:#64748b; font-size:0.8rem;">
-                                {job['source']}
-                            </span>
-                        </div>
-                    </div>
-                </div>
+                            <span style="color:#64748b; font-size:0.8rem;">{job['source']}</span>{f'&nbsp;<span style="color:{_FLAG_CHIP[flag_level][0]};font-size:0.9rem;" title="Company red flags detected">{_FLAG_CHIP[flag_level][1]}</span>' if flag_level and flag_level in _FLAG_CHIP else ""}
+                        </div></div></div>
                 """,
                 unsafe_allow_html=True,
             )
@@ -162,12 +166,22 @@ def render():
                     desc = (job.get("description") or "No description available.")
                     st.markdown(f"**Description:**\n\n{desc[:1500]}{'…' if len(desc) > 1500 else ''}")
                 with c2:
-                    st.markdown(f"**Salary:** {job.get('salary') or 'N/A'}")
+                    _salary_display = job.get("salary") or ""
+                    _salary_est     = job.get("salary_estimate") or ""
+                    if _salary_display:
+                        st.markdown(f"**Salary:** {_salary_display}")
+                    elif _salary_est:
+                        st.markdown(f"**Salary:** ~{_salary_est} *(est.)*")
+                    else:
+                        st.markdown("**Salary:** N/A")
                     st.markdown(f"**Type:** {job.get('job_type') or 'N/A'}")
                     st.markdown(f"**Posted:** {job.get('posted_date') or 'N/A'}")
                     st.markdown(f"**Remote:** {'Yes' if job.get('remote') else 'No'}")
                     if job.get("url"):
                         st.link_button("🔗 Open Job", job["url"])
+
+                    st.divider()
+                    render_company_signals(job)
 
                     new_status = st.selectbox(
                         "Update status",

@@ -31,7 +31,8 @@ _SYSTEM_PROMPT_TEMPLATE = textwrap.dedent("""
       "matched_skills": [<string>, ...],
       "missing_skills": [<string>, ...],
       "highlights": "<one sentence: why this is or isn't a strong fit>",
-      "suggested_keywords": [<string>, ...]
+      "suggested_keywords": [<string>, ...],
+      "salary_estimate": "<estimated annual salary range for this role/seniority/location, e.g. '$90k - $130k'. Return null if the job description already states the salary.>"
     }}
 
     Scoring guide:
@@ -64,6 +65,7 @@ class ScoreResult:
     missing_skills: List[str]
     highlights: str
     suggested_keywords: List[str]
+    salary_estimate: Optional[str]
     raw: dict
 
 
@@ -124,6 +126,9 @@ def score_job(title: str, company: str, description: str,
         else:
             raise ValueError("Could not parse JSON from scorer response:\n" + raw_text)
 
+    raw_estimate = data.get("salary_estimate")
+    salary_estimate = raw_estimate if isinstance(raw_estimate, str) and raw_estimate.strip() else None
+
     return ScoreResult(
         score=int(data.get("score", 0)),
         match_level=data.get("match_level", "unknown"),
@@ -131,6 +136,7 @@ def score_job(title: str, company: str, description: str,
         missing_skills=data.get("missing_skills", []),
         highlights=data.get("highlights", ""),
         suggested_keywords=data.get("suggested_keywords", []),
+        salary_estimate=salary_estimate,
         raw=data,
     )
 

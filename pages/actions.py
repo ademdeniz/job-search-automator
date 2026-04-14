@@ -15,13 +15,34 @@ def render():
 
     # ── post-scrape result banner (persists after rerun) ──────────────────────
     if "last_scrape_count" in st.session_state:
-        count = st.session_state["last_scrape_count"]
+        info = st.session_state["last_scrape_count"]
+        # Support both old int format and new dict format
+        if isinstance(info, dict):
+            count   = info.get("count", 0)
+            scored  = info.get("scored", 0)
+            no_desc = info.get("no_desc", 0)
+        else:
+            count, scored, no_desc = info, 0, 0
+
+        score_note = ""
+        if scored:
+            score_note = f" **{scored} scored** (jobs below your 40-pt filter are hidden)."
+        if no_desc:
+            score_note += f" **{no_desc} pending descriptions** — open each card to paste the full JD, then score manually."
+
         st.success(
-            f"Done! Found **{count} new job(s)** — scraped and scored. "
-            f"Go to **📋 Job Board** to review your matches."
+            f"Done! Found **{count} new job(s)**."
+            + (score_note or " Go to **📋 Job Board** to review your matches.")
         )
+
+        if st.session_state.get("last_fetch_warning"):
+            st.warning(f"Description fetch issue:\n\n```\n{st.session_state['last_fetch_warning']}\n```")
+        if st.session_state.get("last_score_warning"):
+            st.warning(f"Auto-scoring issue:\n\n```\n{st.session_state['last_score_warning']}\n```")
+
         if st.button("Dismiss", key="dismiss_scrape_banner"):
-            del st.session_state["last_scrape_count"]
+            for k in ("last_scrape_count", "last_fetch_warning", "last_score_warning"):
+                st.session_state.pop(k, None)
             st.rerun()
 
     # ── scrape ────────────────────────────────────────────────────────────────
@@ -148,18 +169,29 @@ def render():
                     with st.spinner(f"Fetching descriptions for {len(no_desc)} job(s)… (headless browser)"):
                         fetch_out, fetch_ok = run_cli(["main.py", "fetch"])
                     if not fetch_ok:
-                        st.warning(f"Description fetch had issues — some jobs may not be scored.\n\n```\n{fetch_out}\n```")
+                        st.session_state["last_fetch_warning"] = fetch_out
+                    else:
+                        st.session_state.pop("last_fetch_warning", None)
 
                 # ── auto-score all jobs that now have descriptions ────────────
                 unscored = get_unscored_jobs()
+                scored_count = 0
                 if unscored:
                     with st.spinner(f"Scoring {len(unscored)} job(s) with Claude AI…"):
                         score_out, score_ok = run_cli(["main.py", "score"])
                     if not score_ok:
-                        st.warning(f"Auto-scoring failed — you can score manually below.\n\n```\n{score_out}\n```")
+                        st.session_state["last_score_warning"] = score_out
+                    else:
+                        scored_count = len(unscored)
+                        st.session_state.pop("last_score_warning", None)
 
                 new_jobs = get_all_jobs(status="new")
-                st.session_state["last_scrape_count"] = len(new_jobs)
+                still_no_desc = len([j for j in get_jobs_without_description() if j.get("source") in _SUPPORTED_SOURCES])
+                st.session_state["last_scrape_count"] = {
+                    "count":   len(new_jobs),
+                    "scored":  scored_count,
+                    "no_desc": still_no_desc,
+                }
                 st.rerun()
 
     # ── fetch descriptions ────────────────────────────────────────────────────
