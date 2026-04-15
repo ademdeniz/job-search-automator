@@ -29,6 +29,7 @@ DEFAULT_PROFILE = {
         "enabled":         False,
         "interval_hours":  6,
         "min_score_alert": 70,
+        "location":        "Remote US",
         "notify_email":    "",
         "smtp_from":       "",
         "smtp_password":   "",

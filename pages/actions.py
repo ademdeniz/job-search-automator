@@ -256,6 +256,14 @@ def render():
                 min_value=50, max_value=95, step=5,
                 value=int(_sched.get("min_score_alert", 70)),
             )
+            _loc_options = ["Remote US", "Remote", "Remote US + Remote"]
+            _loc_default = _sched.get("location", "Remote US")
+            sched_location = st.selectbox(
+                "Location mode",
+                _loc_options,
+                index=_loc_options.index(_loc_default) if _loc_default in _loc_options else 0,
+                help="Remote US = US-only remote jobs. Remote = worldwide. Remote US + Remote = both passes.",
+            )
         with sc2:
             st.markdown("**Email notifications** *(optional)*")
             st.caption("Uses Gmail SMTP. Create an [App Password](https://myaccount.google.com/apppasswords) — not your real password.")
@@ -268,6 +276,7 @@ def render():
                 "enabled":         sched_enabled,
                 "interval_hours":  sched_interval,
                 "min_score_alert": sched_min_score,
+                "location":        sched_location,
                 "smtp_from":       sched_smtp_from.strip(),
                 "smtp_password":   sched_smtp_pass.strip(),
                 "notify_email":    sched_notify.strip(),
@@ -291,9 +300,15 @@ def render():
 
         if st.button("▶ Run Pipeline Now", help="Trigger scrape → fetch → score + email notification immediately"):
             with st.spinner("Running full pipeline… (may take a few minutes)"):
-                _kw = _prof.get("target_role", "").strip()
+                _kw  = _prof.get("target_role", "").strip()
+                _loc = sched_location
                 if _kw:
-                    out1, ok1 = run_cli(["main.py", "scrape", "--keywords", _kw])
+                    if _loc == "Remote US + Remote":
+                        out1a, ok1a = run_cli(["main.py", "scrape", "--keywords", _kw, "--location", "Remote US"])
+                        out1b, ok1b = run_cli(["main.py", "scrape", "--keywords", _kw, "--location", "Remote"])
+                        out1, ok1 = out1a + "\n" + out1b, ok1a and ok1b
+                    else:
+                        out1, ok1 = run_cli(["main.py", "scrape", "--keywords", _kw, "--location", _loc])
                     out2, ok2 = run_cli(["main.py", "fetch"])
                     out3, ok3 = run_cli(["main.py", "score"])
                     combined  = "\n\n".join([out1, out2, out3])

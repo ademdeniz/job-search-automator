@@ -226,20 +226,27 @@ def run_pipeline():
     keywords   = (profile.get("target_role") or "").strip()
     min_score  = int(sched.get("min_score_alert", 70))
     sources    = sched.get("sources") or []
+    location   = sched.get("location", "Remote US")
 
     if not keywords:
         print("[Scheduler] No target_role in profile — skipping.", flush=True)
         return
 
     now = datetime.now().strftime("%Y-%m-%d %H:%M")
-    print(f"\n[Scheduler] {now} — starting pipeline (keywords: {keywords})", flush=True)
+    print(f"\n[Scheduler] {now} — starting pipeline (keywords: {keywords}, location: {location})", flush=True)
 
     # ── scrape ────────────────────────────────────────────────────────────────
-    cmd = ["main.py", "scrape", "--keywords", keywords]
+    base_cmd = ["main.py", "scrape", "--keywords", keywords]
     if sources:
-        cmd += ["--sources"] + sources
-    out, _ = _run(cmd)
-    print(f"[Scheduler] Scrape done.\n{out[-500:]}", flush=True)
+        base_cmd += ["--sources"] + sources
+
+    if location == "Remote US + Remote":
+        for loc in ["Remote US", "Remote"]:
+            out, _ = _run(base_cmd + ["--location", loc])
+            print(f"[Scheduler] Scrape ({loc}) done.\n{out[-300:]}", flush=True)
+    else:
+        out, _ = _run(base_cmd + ["--location", location])
+        print(f"[Scheduler] Scrape done.\n{out[-500:]}", flush=True)
 
     # ── fetch descriptions ─────────────────────────────────────────────────────
     out, _ = _run(["main.py", "fetch"])
