@@ -8,6 +8,7 @@ changed their HTML structure. Playwright renders the full page so
 we get reliable, structured data from the guest-accessible job search.
 """
 
+import random
 import time
 from typing import List
 from urllib.parse import urlencode
@@ -162,6 +163,26 @@ _SELECTORS = {
 _SUPPORTED_SOURCES = set(_SELECTORS.keys())
 
 
+_USER_AGENTS = [
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+]
+
+# Stealth script: hide headless browser signals that bot-detection checks
+_STEALTH_JS = """
+Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
+Object.defineProperty(navigator, 'plugins', {get: () => [1, 2, 3, 4, 5]});
+Object.defineProperty(navigator, 'languages', {get: () => ['en-US', 'en']});
+window.chrome = {runtime: {}};
+Object.defineProperty(navigator, 'permissions', {
+    get: () => ({query: () => Promise.resolve({state: 'granted'})}),
+});
+"""
+
+
 def fetch_descriptions(jobs: list, on_progress=None) -> List[tuple]:
     """
     Visit each job's URL with a headless browser and extract the full description.
@@ -179,15 +200,35 @@ def fetch_descriptions(jobs: list, on_progress=None) -> List[tuple]:
     total = len(jobs)
 
     with sync_playwright() as pw:
-        browser = pw.chromium.launch(headless=True)
-        context = browser.new_context(
-            user_agent=(
-                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/120.0.0.0 Safari/537.36"
-            ),
-            viewport={"width": 1280, "height": 800},
+        browser = pw.chromium.launch(
+            headless=True,
+            args=[
+                "--disable-blink-features=AutomationControlled",
+                "--no-sandbox",
+                "--disable-dev-shm-usage",
+                "--disable-infobars",
+                "--window-size=1280,800",
+            ],
         )
+
+        ua = random.choice(_USER_AGENTS)
+        context = browser.new_context(
+            user_agent=ua,
+            viewport={"width": 1280, "height": 800},
+            locale="en-US",
+            timezone_id="America/New_York",
+            extra_http_headers={
+                "Accept-Language": "en-US,en;q=0.9",
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+                "sec-ch-ua": '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
+                "sec-ch-ua-mobile": "?0",
+                "sec-ch-ua-platform": '"macOS"',
+                "Upgrade-Insecure-Requests": "1",
+            },
+        )
+
+        # Inject stealth script on every new page
+        context.add_init_script(_STEALTH_JS)
         page = context.new_page()
 
         for i, job in enumerate(jobs, 1):
@@ -204,7 +245,7 @@ def fetch_descriptions(jobs: list, on_progress=None) -> List[tuple]:
 
             try:
                 page.goto(job["url"], wait_until="domcontentloaded", timeout=25000)
-                time.sleep(1.5)
+                time.sleep(random.uniform(1.5, 3.0))
 
                 # Expand "Show more" buttons (LinkedIn + Indeed)
                 for btn_sel in [
@@ -216,7 +257,7 @@ def fetch_descriptions(jobs: list, on_progress=None) -> List[tuple]:
                         btn = page.query_selector(btn_sel)
                         if btn and btn.is_visible():
                             btn.click()
-                            time.sleep(0.5)
+                            time.sleep(random.uniform(0.4, 0.9))
                     except Exception:
                         pass
 
@@ -238,7 +279,7 @@ def fetch_descriptions(jobs: list, on_progress=None) -> List[tuple]:
             if on_progress:
                 on_progress(i, total, job, desc)
 
-            time.sleep(1.2)
+            time.sleep(random.uniform(2.0, 4.5))
 
         browser.close()
 

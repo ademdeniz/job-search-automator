@@ -32,9 +32,20 @@ with st.sidebar:
     st.caption("Powered by Claude AI")
     st.divider()
 
+    _pages = ["👤 Profile", "🔧 Actions", "📋 Job Board", "📊 Dashboard", "📁 My Applications"]
+    _page_slug_map = {
+        "profile": "👤 Profile",
+        "actions": "🔧 Actions",
+        "job_board": "📋 Job Board",
+        "dashboard": "📊 Dashboard",
+        "my_applications": "📁 My Applications",
+    }
+    _url_page = st.query_params.get("page", "")
+    _default_page = _page_slug_map.get(_url_page, "👤 Profile")
     page = st.radio(
         "Navigate",
-        ["👤 Profile", "🔧 Actions", "📋 Job Board", "📊 Dashboard", "📁 My Applications"],
+        _pages,
+        index=_pages.index(_default_page),
         label_visibility="collapsed",
     )
 

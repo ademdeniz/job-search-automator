@@ -55,34 +55,27 @@ def render():
     active  = profile.get("active_resume", "")
     slots   = list(resumes.keys())
 
-    # ── slot selector + add ───────────────────────────────────────────────────
-    sl1, sl2, sl3 = st.columns([3, 2, 1])
+    # ── row 1: active slot selector + delete ─────────────────────────────────
+    sl1, sl2 = st.columns([4, 1])
     with sl1:
         selected_slot = st.selectbox(
             "Active slot",
             slots,
             index=slots.index(active) if active in slots else 0,
             key="slot_select",
+            help="The active slot is what Claude uses for scoring and tailoring.",
         )
     with sl2:
-        new_slot_name = st.text_input(
-            "New slot name",
-            placeholder="e.g. Senior IC",
-            label_visibility="collapsed",
-            key="new_slot_name",
-        )
-    with sl3:
-        if st.button("➕ Add slot", use_container_width=True, key="add_slot_btn"):
-            name = new_slot_name.strip()
-            if name and name not in resumes:
-                resumes[name] = ""
+        st.markdown("<div style='margin-top:28px'></div>", unsafe_allow_html=True)
+        if len(slots) > 1:
+            if st.button(f"🗑 Delete", key="delete_slot_btn", use_container_width=True,
+                         help=f"Delete slot '{selected_slot}'"):
+                del resumes[selected_slot]
                 profile["resumes"] = resumes
-                profile["active_resume"] = name
-                profile["resume"] = ""
+                profile["active_resume"] = next(iter(resumes))
+                profile["resume"] = resumes[profile["active_resume"]]
                 save_profile(profile)
                 st.rerun()
-            elif name in resumes:
-                st.warning(f"Slot '{name}' already exists.")
 
     # ── switch active slot ────────────────────────────────────────────────────
     if selected_slot != active:
@@ -91,15 +84,30 @@ def render():
         save_profile(profile)
         st.rerun()
 
-    # ── delete slot (only if more than one) ───────────────────────────────────
-    if len(slots) > 1:
-        if st.button(f"🗑 Delete '{selected_slot}'", key="delete_slot_btn"):
-            del resumes[selected_slot]
-            profile["resumes"] = resumes
-            profile["active_resume"] = next(iter(resumes))
-            profile["resume"] = resumes[profile["active_resume"]]
-            save_profile(profile)
-            st.rerun()
+    # ── row 2: add new slot (form ensures text value is captured on submit) ───
+    with st.form("add_slot_form", clear_on_submit=True, border=False):
+        fa1, fa2 = st.columns([4, 1])
+        with fa1:
+            new_slot_name = st.text_input(
+                "New slot name",
+                placeholder="New slot name — e.g. Senior IC, Manager track, Startup…",
+                label_visibility="collapsed",
+            )
+        with fa2:
+            submitted = st.form_submit_button("➕ Add slot", use_container_width=True)
+        if submitted:
+            name = new_slot_name.strip()
+            if not name:
+                st.warning("Enter a slot name first.")
+            elif name in resumes:
+                st.warning(f"Slot '{name}' already exists.")
+            else:
+                resumes[name] = ""
+                profile["resumes"] = resumes
+                profile["active_resume"] = name
+                profile["resume"] = ""
+                save_profile(profile)
+                st.rerun()
 
     # ── resume text area for active slot ──────────────────────────────────────
     p_resume = st.text_area(

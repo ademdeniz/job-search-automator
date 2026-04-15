@@ -160,7 +160,7 @@ def _send_email(cfg: dict, jobs: list) -> tuple:
         <!-- cta -->
         <tr>
           <td style="padding:20px 28px;text-align:center;">
-            <a href="http://localhost:8501"
+            <a href="http://localhost:8501/?page=job_board"
                style="display:inline-block;background:#6366f1;color:#fff;font-weight:600;
                       font-size:0.9rem;padding:10px 24px;border-radius:8px;text-decoration:none;">
               Open Job Board →
@@ -190,7 +190,7 @@ def _send_email(cfg: dict, jobs: list) -> tuple:
         if j.get("url"):
             plain += f"  {j['url']}\n"
         plain += "\n"
-    plain += "Open the Job Board: http://localhost:8501"
+    plain += "Open the Job Board: http://localhost:8501/?page=job_board"
 
     msg = MIMEMultipart("alternative")
     msg["Subject"] = f"🎯 {len(jobs)} new job match{'es' if len(jobs) != 1 else ''} — Job Search Automator"

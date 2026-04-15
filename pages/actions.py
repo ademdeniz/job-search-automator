@@ -86,7 +86,7 @@ def render():
             sources_input = st.multiselect(
                 "Sources  (LinkedIn & Indeed first)",
                 SOURCES,
-                default=["linkedin", "indeed", "remoteok", "weworkremotely", "greenhouse", "lever", "himalayas", "jobspresso"],
+                default=SOURCES,  # all boards selected by default
             )
             max_results = st.slider("Max results per source", 10, 100, 50, step=10)
             freshness = st.select_slider(
