@@ -18,6 +18,9 @@ resume.txt
 # Generated exports
 *.csv
 
+# Runtime state
+scheduler_state.json
+
 # OS
 .DS_Store
 output/
