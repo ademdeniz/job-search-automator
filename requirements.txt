@@ -6,3 +6,6 @@ pandas==2.3.3           # >=2.0.0
 python-docx==1.2.0      # >=1.1.0
 numpy==2.0.2            # required by pandas
 schedule==1.2.2         # background job scheduler
+google-auth==2.40.0                # Gmail OAuth token refresh
+google-auth-oauthlib==1.2.1        # OAuth 2.0 flow (browser sign-in)
+google-api-python-client==2.169.0  # Gmail REST API client

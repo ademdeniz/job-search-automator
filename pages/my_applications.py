@@ -27,6 +27,114 @@ NEXT_LABEL = {
 }
 
 
+def _render_gmail_scanner(app_jobs: list):
+    """Inbox scanner expander — detects responses from applied companies."""
+    import gmail_scanner as _gs
+
+    with st.expander("📬 Scan Inbox for Responses", expanded=False):
+        if not _gs.is_configured():
+            st.markdown(
+                "**Gmail setup required.** Connect your Google account to auto-detect "
+                "interview invites, rejections, and replies.\n\n"
+                "**Steps:**\n"
+                "1. Go to [console.cloud.google.com](https://console.cloud.google.com) → "
+                "APIs & Services → Library → enable **Gmail API**\n"
+                "2. Go to APIs & Services → Credentials → **Create credentials** → "
+                "OAuth 2.0 Client ID → Desktop app → Download JSON\n"
+                "3. Save the downloaded file as **`credentials.json`** in the app root folder\n"
+                "4. Restart the app — a browser tab will open for Google sign-in on first scan"
+            )
+            return
+
+        auth_note = "" if _gs.is_authenticated() else " *(browser sign-in required on first run)*"
+        st.markdown(
+            f"Scans your inbox for emails from companies you applied to and detects "
+            f"interview invites, rejections, and offers using Claude AI.{auth_note}"
+        )
+
+        days_back = st.slider("Look back", 7, 90, 30, step=7,
+                              format="%d days", key="gmail_days_back")
+
+        if st.button("📬 Scan Now", type="primary", key="gmail_scan_btn"):
+            with st.spinner("Scanning inbox… (opening browser for sign-in if first run)"):
+                result = _gs.scan_for_responses(app_jobs, days_back=days_back)
+
+            if result["error"]:
+                st.error(result["error"])
+                return
+
+            scanned = result["scanned"]
+            hits    = result["results"]
+
+            if not hits:
+                st.info(
+                    f"Scanned {scanned} email(s) — no actionable responses detected. "
+                    "Check back after more time has passed, or expand the look-back window."
+                )
+                return
+
+            st.success(f"Found **{len(hits)} response(s)** in {scanned} email(s) scanned.")
+            st.session_state["gmail_scan_results"] = hits
+
+        # ── display results ───────────────────────────────────────────────────
+        if "gmail_scan_results" in st.session_state:
+            hits = st.session_state["gmail_scan_results"]
+            _TYPE_ICON = {
+                "interview_invite": "🎯",
+                "rejection":        "❌",
+                "offer":            "🏆",
+                "info_request":     "❓",
+                "confirmation":     "✅",
+                "other":            "📧",
+            }
+            _TYPE_COLOR = {
+                "interview_invite": "#22c55e",
+                "rejection":        "#ef4444",
+                "offer":            "#f59e0b",
+                "info_request":     "#60a5fa",
+                "confirmation":     "#94a3b8",
+                "other":            "#64748b",
+            }
+
+            for hit in hits:
+                icon  = _TYPE_ICON.get(hit["type"], "📧")
+                color = _TYPE_COLOR.get(hit["type"], "#94a3b8")
+                conf  = int(hit.get("confidence", 0) * 100)
+
+                st.markdown(
+                    f'<div style="border:1px solid {color}44;border-radius:8px;'
+                    f'padding:12px 16px;margin-bottom:10px;background:{color}0d;">'
+                    f'<div style="display:flex;justify-content:space-between;align-items:center;">'
+                    f'<span style="color:{color};font-weight:700;font-size:0.95rem;">'
+                    f'{icon} {hit["type"].replace("_", " ").title()}'
+                    f'</span>'
+                    f'<span style="color:#64748b;font-size:0.75rem;">{conf}% confidence</span>'
+                    f'</div>'
+                    f'<div style="color:#f1f5f9;font-size:0.88rem;margin-top:4px;">'
+                    f'<strong>{hit["company"]}</strong> · {hit["subject"]}'
+                    f'</div>'
+                    f'<div style="color:#94a3b8;font-size:0.8rem;margin-top:2px;">{hit["summary"]}</div>'
+                    f'</div>',
+                    unsafe_allow_html=True,
+                )
+
+                suggested = hit.get("suggested_status")
+                if suggested:
+                    col1, col2 = st.columns([3, 1])
+                    with col2:
+                        btn_label = f"→ Mark as {suggested.title()}"
+                        if st.button(btn_label, key=f"gmail_apply_{hit['job_id']}_{hit['msg_id']}"):
+                            from storage.database import update_status
+                            update_status(hit["job_id"], suggested)
+                            st.toast(f"Status updated to {suggested}!", icon="✅")
+                            del st.session_state["gmail_scan_results"]
+                            st.rerun()
+
+            if st.button("Clear results", key="gmail_clear"):
+                del st.session_state["gmail_scan_results"]
+                st.rerun()
+
+
 def render():
     st.title("📁 My Applications")
     st.caption("Your application history — preserved across fresh searches.")
@@ -68,6 +176,9 @@ def render():
     if not app_jobs:
         st.info("No applications yet. Mark jobs as 'applied' from the Job Board to track them here.")
         st.stop()
+
+    # ── gmail inbox scanner ───────────────────────────────────────────────────
+    _render_gmail_scanner(app_jobs)
 
     st.caption(f"{len(app_jobs)} application(s)")
 

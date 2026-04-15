@@ -21,6 +21,10 @@ resume.txt
 # Runtime state
 scheduler_state.json
 
+# Gmail OAuth — contain personal credentials, never commit
+credentials.json
+token.json
+
 # OS
 .DS_Store
 output/
