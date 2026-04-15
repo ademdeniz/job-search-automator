@@ -22,12 +22,15 @@ Built with Python + Claude AI (Anthropic). Fully role-agnostic — works for any
 - **Location modes** — US Remote, World Remote, Local/Hybrid (any city, state, or zip), or both in one run
 - **Freshness filter** — limit results to jobs posted in the last 24h, 3 days, or 7 days
 - **Fuzzy deduplication** — same job posted across multiple boards is stored once, not three times
+- **Resume slots** — maintain multiple resume versions (e.g. Senior IC, Manager track, Startup) and switch the active slot from the Profile page. Scorer and tailor always use the active slot.
 - **Track** your full application pipeline: applied → interviewing → offer
 - **My Applications** — dedicated tracker with inline stage advancement, notes, and permanent removal
 - **Google Calendar integration** — one-click "Add to Calendar" for interview scheduling (no OAuth required)
 - **Interview prep generator** — Claude Sonnet generates 10 role-specific questions with difficulty rating (easy / medium / hard), a tailored answer using your real experience, and 2 follow-up questions per question. Downloadable as `.docx` or `.pdf`
 - **Follow-up email drafter** — auto-drafts a short, human-sounding follow-up for applications with no response after 7+ days
 - **Application analytics** — response rate by source, score distribution for responded vs. not, pipeline funnel
+- **Rejection pattern analysis** — Claude Haiku scans all your rejected applications, surfaces recurring skill gaps and patterns, and gives you a concrete action plan
+- **Auto-scrape scheduler** — runs the full scrape → fetch → score pipeline automatically in the background on a configurable interval (2–24 hours). Sends an HTML email alert via Gmail when high-score new jobs appear.
 - **Role-agnostic** — scorer and tailor adapt to any domain via your profile (title + target role)
 - **Profile page** — manage your resume, contact info, target role, and writing sample from the UI
 - **Export** to CSV for spreadsheet workflows
@@ -108,13 +111,13 @@ Replace `sk-ant-...` with your actual key.
 ./start.sh
 ```
 
-This opens the dashboard at **http://localhost:8501**.
+This opens the dashboard at **http://localhost:8501** and starts the background scheduler alongside it.
 
 **Before doing anything else, go to the 👤 Profile page** and fill in:
 - Your name, email, LinkedIn, GitHub
 - Professional title (e.g. `Senior QA Engineer`) — appears in your cover letter signature
 - Target role / keywords (e.g. `SDET test automation Appium`) — used as default search terms
-- Your full resume as plain text
+- Your full resume as plain text (you can create multiple named slots for different role types)
 - A writing sample — a paragraph you wrote naturally (LinkedIn post, email, anything). Claude uses this to match your voice in cover letters.
 
 Hit **Save Profile**. This creates `profile.json` locally (gitignored — stays on your machine).
@@ -133,17 +136,17 @@ Opens the Streamlit dashboard at **http://localhost:8501**.
 Five pages:
 
 - **Job Board** — filterable, colour-coded cards (🟢 excellent · 🟡 good · 🟠 fair · 🔴 poor), expandable details with skill chips, inline status updates, tailor button with ATS check badge and `.docx`/`.pdf` downloads
-- **Dashboard** — score distribution, jobs by source, pipeline funnel, top 10 matches, application analytics
-- **Actions** — scrape, fetch descriptions, score with AI, export CSV
+- **Dashboard** — score distribution, jobs by source, pipeline funnel, top 10 matches, application analytics, rejection pattern analysis
+- **Actions** — scrape, fetch descriptions, score with AI, auto-scrape scheduler with email alerts, export CSV
 - **My Applications** — tracks applied/interviewing/offer jobs with one-click stage advancement, notes, interview prep, follow-up email drafter, and Google Calendar integration
-- **Profile** — manage your resume, contact info, and writing sample
+- **Profile** — manage multiple resume slots, contact info, and writing sample
 
 ---
 
 ## UI Workflow — Step by Step
 
 ### 1. Set up your profile
-Go to **Profile** and fill in your name, email, LinkedIn, GitHub, professional title, target role/keywords, paste your full resume as plain text, and optionally paste a writing sample. Hit **Save Profile**. Nothing works until this is done.
+Go to **Profile** and fill in your name, email, LinkedIn, GitHub, professional title, target role/keywords, paste your full resume as plain text (add multiple named slots for different role types), and optionally paste a writing sample. Hit **Save Profile**. Nothing works until this is done.
 
 ### 2. Scrape jobs
 Go to **Actions → Scrape Jobs**. Choose your sources, location mode (US Remote / World Remote / Local), and freshness window (1 / 3 / 7 days). Hit **Run Scrape**. New jobs appear on the Job Board immediately.
@@ -182,6 +185,46 @@ Jobs you mark as `applied` move to **My Applications**. From there you can:
 - Schedule interviews with a pre-filled Google Calendar link
 - Generate interview prep (10 role-specific Q&As, downloadable as `.docx`/`.pdf`)
 - Draft a follow-up email (appears automatically after 7 days with no response)
+
+---
+
+## Auto-Scrape Scheduler
+
+`start.sh` launches a background scheduler alongside the UI. It runs the full scrape → fetch → score pipeline automatically on a configurable interval and emails you when high-score new jobs appear.
+
+### Configure it
+
+Go to **Actions → ⏰ Auto-Scrape Scheduler** in the UI and set:
+
+| Field | Description |
+|---|---|
+| Enable scheduler | Toggle on/off |
+| Run every | 2 / 4 / 6 / 8 / 12 / 24 hours |
+| Notify when score ≥ | Only alert for jobs above this threshold (default 70) |
+| Your Gmail address | The address that sends the alert |
+| App password | A Gmail App Password — **not** your real password |
+| Send alerts to | Where to receive alerts (can be same as sender) |
+
+Hit **Save Scheduler Settings**, then the scheduler picks up the new config within the hour.
+
+### Gmail App Password setup
+
+You need a [Gmail App Password](https://myaccount.google.com/apppasswords) — Google's 16-character password for third-party SMTP access.
+
+1. Go to [myaccount.google.com/apppasswords](https://myaccount.google.com/apppasswords)
+2. Sign in and select **Mail** + your device
+3. Copy the 16-character password (format: `xxxx xxxx xxxx xxxx`)
+4. Paste it into the **App password** field in the UI — never use your real Gmail password
+
+> **2-Step Verification must be enabled on your Google account** for App Passwords to appear.
+
+### What the email looks like
+
+You'll receive an HTML email showing each new high-score job with its score badge, title, company, location, and a direct link that opens the Job Board in the app.
+
+### Limitations
+
+The scheduler runs as a background process on your machine — it requires `start.sh` to be running. If your laptop is off or the app is closed, it won't fire.
 
 ---
 
@@ -271,7 +314,8 @@ Valid statuses: `new` · `applied` · `interviewing` · `offer` · `rejected`
 ```
 job-search-automator/
 ├── main.py               # CLI entry point — all commands
-├── start.sh              # Launch UI with preflight checks: ./start.sh
+├── start.sh              # Launch UI + background scheduler: ./start.sh
+├── scheduler.py          # Background scrape → fetch → score pipeline + email alerts
 ├── profile.json          # Your profile — created on first save in UI (gitignored)
 ├── requirements.txt
 │
@@ -334,12 +378,15 @@ job-search-automator/
 - [x] Follow-up email drafter (7+ days, no response)
 - [x] Application analytics (response rate by source, score distribution)
 - [x] Profile page — manage resume, contact info, writing sample from UI
+- [x] Multiple resume slots — switch active slot per role type from the Profile page
 - [x] PDF output via LibreOffice (free, offline)
 - [x] CSV export
 - [x] Salary estimate — AI-estimated range injected at scoring time when posting doesn't list one
 - [x] Company red-flag signals — layoffs, Glassdoor, financial distress, churn (Claude Haiku, cached)
+- [x] Auto-scrape scheduler — background pipeline on configurable interval, HTML email alerts via Gmail
+- [x] Rejection pattern analysis — Claude Haiku surfaces skill gaps and patterns from rejected applications
 - [ ] Auto-apply (LinkedIn Easy Apply + Greenhouse forms)
-- [ ] Email / push notifications for high-score new jobs
+- [ ] Job market pulse — trending roles, in-demand skills from scraped data over time
 
 ---
 
