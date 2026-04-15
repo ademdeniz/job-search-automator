@@ -112,9 +112,13 @@ def _send_email(cfg: dict, jobs: list) -> tuple:
     # ── HTML body ─────────────────────────────────────────────────────────────
     job_cards = ""
     for j in jobs:
-        color = _score_color(j["score"])
-        url   = j.get("url", "")
-        link  = f'<a href="{url}" style="color:#60a5fa;text-decoration:none;">{j["title"]}</a>' if url else j["title"]
+        color    = _score_color(j["score"])
+        url      = j.get("url", "")
+        view_btn = (
+            f'<a href="{url}" style="display:inline-block;margin-top:8px;color:#60a5fa;'
+            f'font-size:0.78rem;text-decoration:none;border:1px solid #334155;'
+            f'padding:3px 10px;border-radius:6px;">View job posting →</a>'
+        ) if url else ""
         job_cards += f"""
         <tr>
           <td style="padding:12px 16px;border-bottom:1px solid #334155;">
@@ -124,10 +128,11 @@ def _send_email(cfg: dict, jobs: list) -> tuple:
                 {j['score']}/100
               </span>
               <div>
-                <div style="color:#f1f5f9;font-weight:600;font-size:0.95rem;">{link}</div>
+                <div style="color:#f1f5f9;font-weight:600;font-size:0.95rem;">{j['title']}</div>
                 <div style="color:#94a3b8;font-size:0.82rem;margin-top:2px;">
                   {j['company']} &nbsp;·&nbsp; {j['location']}
                 </div>
+                {view_btn}
               </div>
             </div>
           </td>
