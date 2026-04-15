@@ -152,7 +152,7 @@ def cmd_score(args):
         print("Use --all to re-score everything.")
         return
 
-    print(f"Scoring {len(jobs)} job(s) against resume.txt …\n")
+    print(f"Scoring {len(jobs)} job(s) against your resume…\n")
 
     try:
         resume_text = _load_resume()

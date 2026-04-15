@@ -289,7 +289,7 @@ def render():
             except Exception:
                 pass
 
-        if st.button("▶ Run Pipeline Now", help="Trigger scrape → fetch → score immediately"):
+        if st.button("▶ Run Pipeline Now", help="Trigger scrape → fetch → score + email notification immediately"):
             with st.spinner("Running full pipeline… (may take a few minutes)"):
                 _kw = _prof.get("target_role", "").strip()
                 if _kw:
@@ -298,6 +298,23 @@ def render():
                     out3, ok3 = run_cli(["main.py", "score"])
                     combined  = "\n\n".join([out1, out2, out3])
                     show_cli_result(combined, ok1 and ok2 and ok3)
+
+                    # ── send notification if email configured ─────────────────
+                    _sched_cfg = load_profile().get("scheduler", {})
+                    _min       = int(_sched_cfg.get("min_score_alert", 70))
+                    from scheduler import _get_new_high_score_jobs, _send_email
+                    # Only look at jobs scraped in the last 60 min (this run)
+                    _hits = _get_new_high_score_jobs(_min, since_minutes=60)
+                    if _hits:
+                        _ok, _err = _send_email(_sched_cfg, _hits)
+                        if _ok:
+                            st.success(f"📧 Email sent — {len(_hits)} new job(s) scored {_min}+.")
+                        elif _err and ("not configured" in _err):
+                            st.info(f"Found {len(_hits)} new job(s) scored {_min}+ but email is not configured.")
+                        else:
+                            st.warning(f"Found {len(_hits)} new job(s) scored {_min}+ but email failed: {_err}")
+                    else:
+                        st.info(f"No new jobs from this run scored {_min}+ — no email sent.")
                 else:
                     st.warning("Set a Target Role in your Profile first.")
 

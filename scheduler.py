@@ -63,19 +63,26 @@ def _run(cmd: list) -> tuple:
     return result.stdout + result.stderr, result.returncode
 
 
-def _get_new_high_score_jobs(min_score: int) -> list:
-    """Query DB for new jobs above the min score threshold."""
+def _get_new_high_score_jobs(min_score: int, since_minutes: int = 60) -> list:
+    """
+    Query DB for new jobs above the min score threshold scraped recently.
+    Only returns jobs scraped within the last `since_minutes` minutes
+    so we don't re-notify for old jobs on every run.
+    """
     try:
         import sqlite3
+        from datetime import datetime, timedelta
         db = ROOT / "jobs.db"
         if not db.exists():
             return []
+        cutoff = (datetime.now() - timedelta(minutes=since_minutes)).isoformat()
         conn = sqlite3.connect(db)
         conn.row_factory = sqlite3.Row
         rows = conn.execute(
             "SELECT title, company, location, score, url FROM jobs "
-            "WHERE status='new' AND score >= ? ORDER BY score DESC LIMIT 20",
-            (min_score,),
+            "WHERE status='new' AND score >= ? AND scraped_at >= ? "
+            "ORDER BY score DESC LIMIT 20",
+            (min_score, cutoff),
         ).fetchall()
         conn.close()
         return [dict(r) for r in rows]
@@ -83,14 +90,17 @@ def _get_new_high_score_jobs(min_score: int) -> list:
         return []
 
 
-def _send_email(cfg: dict, jobs: list):
-    """Send a notification email via SMTP (Gmail app password)."""
+def _send_email(cfg: dict, jobs: list) -> tuple:
+    """
+    Send a notification email via SMTP (Gmail app password).
+    Returns (success: bool, error_message: str).
+    """
     smtp_from = cfg.get("smtp_from", "").strip()
     smtp_pass = cfg.get("smtp_password", "").strip()
     notify_to = cfg.get("notify_email", "").strip() or smtp_from
 
     if not smtp_from or not smtp_pass:
-        return  # email not configured
+        return False, "Email not configured — add Gmail address and app password."
 
     lines = [
         f"Job Search Automator found {len(jobs)} new high-score job(s):\n",
@@ -115,8 +125,10 @@ def _send_email(cfg: dict, jobs: list):
             server.login(smtp_from, smtp_pass)
             server.sendmail(smtp_from, notify_to, msg.as_string())
         print(f"[Scheduler] Email sent to {notify_to}", flush=True)
+        return True, ""
     except Exception as e:
         print(f"[Scheduler] Email failed: {e}", flush=True)
+        return False, str(e)
 
 
 # ── main job ──────────────────────────────────────────────────────────────────
@@ -159,8 +171,10 @@ def run_pipeline():
 
     if high_score_jobs:
         print(f"[Scheduler] {len(high_score_jobs)} job(s) above {min_score} — sending notification.", flush=True)
-        _send_email(sched, high_score_jobs)
-        state["last_alerted"] = len(high_score_jobs)
+        ok, err = _send_email(sched, high_score_jobs)
+        if not ok:
+            print(f"[Scheduler] Notification skipped: {err}", flush=True)
+        state["last_alerted"] = len(high_score_jobs) if ok else 0
     else:
         print(f"[Scheduler] No new jobs above {min_score}.", flush=True)
         state["last_alerted"] = 0
