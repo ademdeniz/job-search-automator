@@ -19,6 +19,7 @@ import sys
 import time
 from datetime import datetime
 from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from pathlib import Path
 
 import schedule
@@ -102,23 +103,101 @@ def _send_email(cfg: dict, jobs: list) -> tuple:
     if not smtp_from or not smtp_pass:
         return False, "Email not configured — add Gmail address and app password."
 
-    lines = [
-        f"Job Search Automator found {len(jobs)} new high-score job(s):\n",
-    ]
+    def _score_color(score):
+        if score >= 90: return "#22c55e"
+        if score >= 70: return "#eab308"
+        if score >= 50: return "#f97316"
+        return "#ef4444"
+
+    # ── HTML body ─────────────────────────────────────────────────────────────
+    job_cards = ""
     for j in jobs:
-        lines.append(
-            f"  • {j['score']}/100 — {j['title']} @ {j['company']} ({j['location']})"
-        )
+        color = _score_color(j["score"])
+        url   = j.get("url", "")
+        link  = f'<a href="{url}" style="color:#60a5fa;text-decoration:none;">{j["title"]}</a>' if url else j["title"]
+        job_cards += f"""
+        <tr>
+          <td style="padding:12px 16px;border-bottom:1px solid #334155;">
+            <div style="display:flex;align-items:center;gap:12px;">
+              <span style="background:{color}22;color:{color};font-weight:700;font-size:1rem;
+                           padding:4px 10px;border-radius:8px;white-space:nowrap;">
+                {j['score']}/100
+              </span>
+              <div>
+                <div style="color:#f1f5f9;font-weight:600;font-size:0.95rem;">{link}</div>
+                <div style="color:#94a3b8;font-size:0.82rem;margin-top:2px;">
+                  {j['company']} &nbsp;·&nbsp; {j['location']}
+                </div>
+              </div>
+            </div>
+          </td>
+        </tr>"""
+
+    html = f"""<!DOCTYPE html>
+<html>
+<body style="margin:0;padding:0;background:#0f172a;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#0f172a;padding:32px 0;">
+    <tr><td align="center">
+      <table width="560" cellpadding="0" cellspacing="0" style="background:#1e293b;border-radius:12px;overflow:hidden;">
+
+        <!-- header -->
+        <tr>
+          <td style="background:#6366f1;padding:24px 28px;">
+            <div style="color:#fff;font-size:1.1rem;font-weight:700;">🎯 Job Search Automator</div>
+            <div style="color:#c7d2fe;font-size:0.85rem;margin-top:4px;">
+              Found <strong>{len(jobs)} new job match{'es' if len(jobs) != 1 else ''}</strong> above your score threshold
+            </div>
+          </td>
+        </tr>
+
+        <!-- job cards -->
+        <tr><td>
+          <table width="100%" cellpadding="0" cellspacing="0">
+            {job_cards}
+          </table>
+        </td></tr>
+
+        <!-- cta -->
+        <tr>
+          <td style="padding:20px 28px;text-align:center;">
+            <a href="http://localhost:8501"
+               style="display:inline-block;background:#6366f1;color:#fff;font-weight:600;
+                      font-size:0.9rem;padding:10px 24px;border-radius:8px;text-decoration:none;">
+              Open Job Board →
+            </a>
+          </td>
+        </tr>
+
+        <!-- footer -->
+        <tr>
+          <td style="padding:0 28px 20px;text-align:center;">
+            <div style="color:#475569;font-size:0.75rem;">
+              Sent by Job Search Automator running on your machine
+            </div>
+          </td>
+        </tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>"""
+
+    # Plain-text fallback
+    plain = f"Job Search Automator found {len(jobs)} new high-score job(s):\n\n"
+    for j in jobs:
+        plain += f"  {j['score']}/100 — {j['title']} @ {j['company']} ({j['location']})\n"
         if j.get("url"):
-            lines.append(f"    {j['url']}")
-        lines.append("")
+            plain += f"  {j['url']}\n"
+        plain += "\n"
+    plain += "Open the Job Board: http://localhost:8501"
 
-    lines.append("Open the Job Board to review: http://localhost:8501")
-
-    msg = MIMEText("\n".join(lines))
-    msg["Subject"] = f"🎯 {len(jobs)} new job match(es) — Job Search Automator"
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = f"🎯 {len(jobs)} new job match{'es' if len(jobs) != 1 else ''} — Job Search Automator"
     msg["From"]    = smtp_from
     msg["To"]      = notify_to
+    msg.attach(MIMEText(plain, "plain"))
+    msg.attach(MIMEText(html,  "html"))
 
     try:
         with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=15) as server:
