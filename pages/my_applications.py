@@ -101,6 +101,47 @@ def _render_gmail_scanner(app_jobs: list):
                 color = _TYPE_COLOR.get(hit["type"], "#94a3b8")
                 conf  = int(hit.get("confidence", 0) * 100)
 
+                # Build detail rows for structured fields
+                detail_rows = ""
+                if hit.get("interview_date"):
+                    detail_rows += (
+                        f'<div style="margin-top:6px;color:#f1f5f9;font-size:0.83rem;">'
+                        f'📅 <strong>When:</strong> {hit["interview_date"]}</div>'
+                    )
+                if hit.get("interview_format"):
+                    fmt = hit["interview_format"].title()
+                    fmt_icon = {"Phone": "📞", "Video": "🎥", "Onsite": "🏢"}.get(fmt, "💬")
+                    detail_rows += (
+                        f'<div style="margin-top:4px;color:#f1f5f9;font-size:0.83rem;">'
+                        f'{fmt_icon} <strong>Format:</strong> {fmt}</div>'
+                    )
+                if hit.get("meeting_link"):
+                    detail_rows += (
+                        f'<div style="margin-top:4px;font-size:0.83rem;">'
+                        f'🔗 <a href="{hit["meeting_link"]}" target="_blank" '
+                        f'style="color:#60a5fa;">Join meeting →</a></div>'
+                    )
+                if hit.get("contact_name"):
+                    detail_rows += (
+                        f'<div style="margin-top:4px;color:#94a3b8;font-size:0.83rem;">'
+                        f'👤 <strong>Contact:</strong> {hit["contact_name"]}</div>'
+                    )
+                if hit.get("contact_email") and hit.get("contact_email") != hit.get("sender"):
+                    detail_rows += (
+                        f'<div style="margin-top:2px;color:#94a3b8;font-size:0.8rem;">'
+                        f'✉️ {hit["contact_email"]}</div>'
+                    )
+                elif hit.get("sender"):
+                    detail_rows += (
+                        f'<div style="margin-top:2px;color:#94a3b8;font-size:0.8rem;">'
+                        f'✉️ {hit["sender"]}</div>'
+                    )
+                if hit.get("next_steps"):
+                    detail_rows += (
+                        f'<div style="margin-top:6px;color:#fbbf24;font-size:0.82rem;">'
+                        f'⚡ <strong>Next:</strong> {hit["next_steps"]}</div>'
+                    )
+
                 st.markdown(
                     f'<div style="border:1px solid {color}44;border-radius:8px;'
                     f'padding:12px 16px;margin-bottom:10px;background:{color}0d;">'
@@ -114,6 +155,7 @@ def _render_gmail_scanner(app_jobs: list):
                     f'<strong>{hit["company"]}</strong> · {hit["subject"]}'
                     f'</div>'
                     f'<div style="color:#94a3b8;font-size:0.8rem;margin-top:2px;">{hit["summary"]}</div>'
+                    f'{detail_rows}'
                     f'</div>',
                     unsafe_allow_html=True,
                 )

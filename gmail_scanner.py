@@ -84,27 +84,136 @@ def _get_message(service, msg_id: str) -> dict:
     ).execute()
 
 
+def _decode_body(data: str) -> str:
+    """Base64url-decode a Gmail message part body."""
+    import base64
+    try:
+        return base64.urlsafe_b64decode(data + "==").decode("utf-8", errors="replace")
+    except Exception:
+        return ""
+
+
+def _parse_ical(ical_text: str) -> str:
+    """
+    Extract human-readable details from iCal text.
+    Returns a plain-text summary of the event.
+    """
+    def _ical_val(key: str) -> str:
+        m = re.search(rf"^{key}[;:][^\r\n]*:?(.+)$", ical_text, re.MULTILINE | re.IGNORECASE)
+        if not m:
+            return ""
+        # Handle folded lines (iCal lines can wrap with leading space/tab)
+        raw = m.group(0)
+        # Strip the key prefix
+        val = re.sub(rf"^{key}[^:]*:", "", raw, flags=re.IGNORECASE).strip()
+        return val
+
+    summary  = _ical_val("SUMMARY")
+    start    = _ical_val("DTSTART")
+    end      = _ical_val("DTEND")
+    location = _ical_val("LOCATION")
+    desc     = _ical_val("DESCRIPTION")
+    organizer = re.search(r'CN=([^:;\r\n]+)', ical_text)
+    organizer = organizer.group(1).strip() if organizer else ""
+
+    parts = []
+    if summary:  parts.append(f"Event: {summary}")
+    if start:    parts.append(f"Start: {start}")
+    if end:      parts.append(f"End: {end}")
+    if location: parts.append(f"Location: {location}")
+    if organizer: parts.append(f"Organizer: {organizer}")
+    if desc:     parts.append(f"Details: {desc[:400]}")
+    return "\n".join(parts)
+
+
+def _extract_plain_text(payload: dict) -> str:
+    """
+    Recursively walk the MIME payload to find the best plain-text body.
+    Handles text/plain, text/html, and text/calendar (meeting invites).
+    Returns the richest available text, preferring calendar data for invites.
+    """
+    mime = payload.get("mimeType", "")
+    body_data = payload.get("body", {}).get("data", "")
+
+    if mime == "text/calendar" and body_data:
+        ical = _decode_body(body_data)
+        return _parse_ical(ical)
+
+    if mime == "text/plain" and body_data:
+        return _decode_body(body_data)
+
+    if mime == "text/html" and body_data:
+        html = _decode_body(body_data)
+        text = re.sub(r"<[^>]+>", " ", html)
+        text = re.sub(r"\s+", " ", text).strip()
+        return text
+
+    # Walk parts — collect all, prefer calendar > plain > html
+    calendar_text = ""
+    plain_text = ""
+    html_text = ""
+    for part in payload.get("parts", []):
+        result = _extract_plain_text(part)
+        sub_mime = part.get("mimeType", "")
+        if result:
+            if "calendar" in sub_mime:
+                calendar_text = result
+            elif sub_mime == "text/plain":
+                plain_text = result
+            elif sub_mime == "text/html":
+                html_text = result
+            elif not plain_text and not calendar_text:
+                plain_text = result
+
+    return calendar_text or plain_text or html_text
+
+
 def _extract_text(msg: dict) -> tuple:
     """
-    Extract (subject, body_snippet) from a Gmail message dict.
-    Returns plain text — strips HTML tags from body if needed.
+    Extract (subject, sender, body_text) from a Gmail message dict.
+    Returns up to 800 chars of body text for richer classification.
     """
     headers = {h["name"].lower(): h["value"] for h in msg.get("payload", {}).get("headers", [])}
     subject = headers.get("subject", "(no subject)")
     sender  = headers.get("from", "")
-    snippet = msg.get("snippet", "")
+    date    = headers.get("date", "")
 
-    # snippet is plain text and usually enough for classification (200 chars)
-    return subject, sender, snippet
+    body = _extract_plain_text(msg.get("payload", {}))
+    if not body:
+        body = msg.get("snippet", "")
+
+    return subject, sender, body[:800], date
+
+
+_CLASSIFY_PROMPT = """You are classifying emails received after a job application.
+For each email below, return a JSON array where each item has:
+- "index": the [N] number
+- "type": one of "interview_invite", "rejection", "offer", "info_request", "confirmation", "other"
+- "confidence": 0.0-1.0
+- "suggested_status": "interviewing" for interview_invite/offer, "rejected" for rejection, null otherwise
+- "summary": one sentence describing what the email is about
+- "interview_date": date/time string if an interview is scheduled, null otherwise (e.g. "Friday April 17 at 11:00 AM ET")
+- "interview_format": format if mentioned — "phone", "video", "onsite", or null
+- "meeting_link": video call URL if present in the body (Zoom/Teams/Meet link), null otherwise
+- "contact_name": name of the recruiter/hiring manager if mentioned, null otherwise
+- "contact_email": reply-to or sender email address (extract from From header)
+- "next_steps": one sentence on what action is needed, null if none
+
+Extract interview_date, meeting_link, and contact_name carefully.
+For calendar invites the body may contain iCal fields (DTSTART, LOCATION, ORGANIZER) — parse these.
+
+Emails:
+{blocks}
+
+Return ONLY a valid JSON array, no other text."""
 
 
 def _classify_emails(emails: list, applied_jobs: list) -> list:
     """
-    Use Claude Haiku to classify a batch of emails and match them to jobs.
+    Use Claude Haiku to classify emails in batches of 10.
 
-    emails: list of {"job_id", "company", "subject", "sender", "snippet"}
-    Returns list of {"job_id", "company", "subject", "sender", "snippet",
-                      "type", "confidence", "suggested_status", "summary"}
+    emails: list of {"job_id", "company", "subject", "sender", "body", "date"}
+    Returns list with added classification + detail fields.
     """
     if not emails:
         return []
@@ -112,46 +221,38 @@ def _classify_emails(emails: list, applied_jobs: list) -> list:
     import anthropic
     client = anthropic.Anthropic()
 
-    # Build compact prompt — one email per line
-    email_lines = "\n".join(
-        f'[{i}] Company: {e["company"]} | From: {e["sender"]} | '
-        f'Subject: {e["subject"]} | Snippet: {e["snippet"][:200]}'
-        for i, e in enumerate(emails)
-    )
+    BATCH = 10
+    all_results = []
 
-    prompt = f"""You are classifying emails received after a job application.
-For each email below, return a JSON array where each item has:
-- "index": the [N] number
-- "type": one of "interview_invite", "rejection", "offer", "info_request", "confirmation", "other"
-- "confidence": 0.0-1.0
-- "suggested_status": "interviewing" for interview_invite/offer, "rejected" for rejection, null otherwise
-- "summary": one short sentence describing what the email is about
+    for batch_start in range(0, len(emails), BATCH):
+        batch = emails[batch_start:batch_start + BATCH]
 
-Emails:
-{email_lines}
-
-Return ONLY a valid JSON array, no other text."""
-
-    try:
-        resp = client.messages.create(
-            model="claude-haiku-4-5-20251001",
-            max_tokens=1024,
-            messages=[{"role": "user", "content": prompt}],
+        blocks = "\n\n".join(
+            f'[{i}]\nCompany: {e["company"]}\nFrom: {e["sender"]}\n'
+            f'Date: {e.get("date", "")}\nSubject: {e["subject"]}\nBody: {e["body"][:500]}'
+            for i, e in enumerate(batch)
         )
-        raw = resp.content[0].text.strip()
-        # Strip markdown code fences if present
-        raw = re.sub(r"^```(?:json)?\s*|\s*```$", "", raw, flags=re.S).strip()
-        classifications = json.loads(raw)
-    except Exception as e:
-        print(f"[Gmail] Classification failed: {e}")
-        return []
+        prompt = _CLASSIFY_PROMPT.format(blocks=blocks)
 
-    results = []
-    for c in classifications:
-        idx = c.get("index", -1)
-        if 0 <= idx < len(emails):
-            results.append({**emails[idx], **c})
-    return results
+        try:
+            resp = client.messages.create(
+                model="claude-haiku-4-5-20251001",
+                max_tokens=2048,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            raw = resp.content[0].text.strip()
+            raw = re.sub(r"^```(?:json)?\s*|\s*```$", "", raw, flags=re.S).strip()
+            classifications = json.loads(raw)
+        except Exception as e:
+            print(f"[Gmail] Classification batch {batch_start} failed: {e}", flush=True)
+            continue
+
+        for c in classifications:
+            idx = c.get("index", -1)
+            if 0 <= idx < len(batch):
+                all_results.append({**batch[idx], **c})
+
+    return all_results
 
 
 # ── Public API ────────────────────────────────────────────────────────────────
@@ -183,54 +284,52 @@ def scan_for_responses(applied_jobs: list, days_back: int = 30) -> dict:
     from datetime import datetime, timedelta
     cutoff = (datetime.now() - timedelta(days=days_back)).strftime("%Y/%m/%d")
 
-    # Build company name search terms — quote multi-word names
-    company_terms = []
-    for job in applied_jobs:
-        name = job.get("company", "").strip()
-        if name:
-            company_terms.append(f'"{name}"' if " " in name else name)
-
-    if not company_terms:
-        return {"results": [], "scanned": 0, "error": None}
-
-    # Deduplicate
-    unique_terms = list(dict.fromkeys(company_terms))[:30]  # cap at 30 to keep query short
-    company_query = " OR ".join(unique_terms)
-
-    # Job-related keywords to filter noise
-    job_keywords = (
-        "interview OR application OR applied OR position OR role OR opportunity OR "
-        "candidate OR hiring OR offer OR unfortunately OR regret OR moving forward OR "
-        "next steps OR schedule OR assessment OR screening"
-    )
-
-    query = f"({company_query}) ({job_keywords}) after:{cutoff}"
-
-    try:
-        messages = _search_messages(service, query, max_results=50)
-    except Exception as e:
-        return {"results": [], "scanned": 0, "error": f"Search failed: {e}"}
-
-    if not messages:
-        return {"results": [], "scanned": 0, "error": None}
-
-    # Build a lookup: company name (lower) → job
+    # Build a lookup: company name (lower) → job (used for matching after fetch)
     company_job_map = {}
     for job in applied_jobs:
         key = job.get("company", "").strip().lower()
         if key:
             company_job_map[key] = job
 
+    if not company_job_map:
+        return {"results": [], "scanned": 0, "error": None}
+
+    # Broad keyword search — no company name filter so ALL 65+ companies are covered.
+    # Company matching happens in Python after fetching.
+    job_keywords = (
+        "interview OR invitation OR application OR applied OR position OR "
+        "candidate OR hiring OR offer OR unfortunately OR regret OR "
+        "\"moving forward\" OR \"next steps\" OR schedule OR assessment OR screening"
+    )
+    query          = f"({job_keywords}) after:{cutoff}"
+    # Separate pass for Google Calendar invites (sent from calendar-notification@google.com)
+    calendar_query = f"subject:Invitation after:{cutoff}"
+
+    try:
+        messages     = _search_messages(service, query, max_results=75)
+        cal_messages = _search_messages(service, calendar_query, max_results=25)
+        # Merge, deduplicate by message id
+        seen_ids = {m["id"] for m in messages}
+        for m in cal_messages:
+            if m["id"] not in seen_ids:
+                messages.append(m)
+                seen_ids.add(m["id"])
+    except Exception as e:
+        return {"results": [], "scanned": 0, "error": f"Search failed: {e}"}
+
+    if not messages:
+        return {"results": [], "scanned": 0, "error": None}
+
     # Fetch and match emails to jobs
     emails_to_classify = []
     for msg_meta in messages:
         try:
             msg = _get_message(service, msg_meta["id"])
-            subject, sender, snippet = _extract_text(msg)
+            subject, sender, body, date = _extract_text(msg)
 
             # Match to a job by company name mention
             matched_job = None
-            subject_lower = (subject + " " + snippet).lower()
+            subject_lower = (subject + " " + body).lower()
             for company_key, job in company_job_map.items():
                 if company_key and company_key in subject_lower:
                     matched_job = job
@@ -251,7 +350,8 @@ def scan_for_responses(applied_jobs: list, days_back: int = 30) -> dict:
                     "title":   matched_job.get("title", ""),
                     "subject": subject,
                     "sender":  sender,
-                    "snippet": snippet,
+                    "body":    body,
+                    "date":    date,
                     "msg_id":  msg_meta["id"],
                 })
         except Exception:
@@ -259,10 +359,15 @@ def scan_for_responses(applied_jobs: list, days_back: int = 30) -> dict:
 
     classified = _classify_emails(emails_to_classify, applied_jobs)
 
-    # Filter to only actionable results (confidence >= 0.6, not "other")
+    # Filter to only actionable results — interview/offer use lower threshold
+    # since calendar invites are unambiguous even at lower confidence scores
+    _HIGH_VALUE = {"interview_invite", "offer"}
     actionable = [
         r for r in classified
-        if r.get("confidence", 0) >= 0.6 and r.get("type") != "other"
+        if r.get("type") != "other" and (
+            r.get("confidence", 0) >= 0.5 if r.get("type") in _HIGH_VALUE
+            else r.get("confidence", 0) >= 0.6
+        )
     ]
 
     return {
