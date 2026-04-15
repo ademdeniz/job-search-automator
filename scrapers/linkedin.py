@@ -8,10 +8,12 @@ changed their HTML structure. Playwright renders the full page so
 we get reliable, structured data from the guest-accessible job search.
 """
 
+import json as _json
 import random
+import re as _re
 import time
 from typing import List
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlparse, parse_qs
 
 from models.job import Job
 from .base import BaseScraper
@@ -183,6 +185,69 @@ Object.defineProperty(navigator, 'permissions', {
 """
 
 
+def _fetch_indeed_description(url: str) -> str:
+    """
+    Fetch an Indeed job description via static HTML (no Playwright).
+    Indeed embeds the full description as JSON-LD in the page source,
+    which is served in the initial HTML response for SEO — no JS needed.
+
+    Falls back to empty string on failure.
+    """
+    import requests
+
+    # Extract jk from redirect URL (/rc/clk?jk=XXX) or viewjob URL
+    jk = ""
+    parsed = urlparse(url)
+    qs = parse_qs(parsed.query)
+    if "jk" in qs:
+        jk = qs["jk"][0]
+
+    view_url = f"https://www.indeed.com/viewjob?jk={jk}" if jk else url
+
+    headers = {
+        "User-Agent": random.choice(_USER_AGENTS),
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Connection": "keep-alive",
+        "Upgrade-Insecure-Requests": "1",
+    }
+
+    try:
+        resp = requests.get(view_url, headers=headers, timeout=15, allow_redirects=True)
+        if resp.status_code != 200:
+            return ""
+        html = resp.text
+
+        # Try JSON-LD first (most reliable — Google-indexed structured data)
+        for match in _re.finditer(r'<script[^>]+type="application/ld\+json"[^>]*>(.*?)</script>', html, _re.S):
+            try:
+                data = _json.loads(match.group(1))
+                if isinstance(data, dict) and data.get("@type") == "JobPosting":
+                    desc = data.get("description", "")
+                    # Strip HTML tags from the description
+                    desc = _re.sub(r"<[^>]+>", " ", desc)
+                    desc = _re.sub(r"\s+", " ", desc).strip()
+                    if len(desc) > 100:
+                        return desc
+            except Exception:
+                continue
+
+        # Fallback: look for the description in a data attribute or hidden div
+        m = _re.search(r'"jobDescription"\s*:\s*"((?:[^"\\]|\\.)*)"', html)
+        if m:
+            desc = m.group(1).encode().decode("unicode_escape")
+            desc = _re.sub(r"<[^>]+>", " ", desc)
+            desc = _re.sub(r"\s+", " ", desc).strip()
+            if len(desc) > 100:
+                return desc
+
+    except Exception:
+        pass
+
+    return ""
+
+
 def fetch_descriptions(jobs: list, on_progress=None) -> List[tuple]:
     """
     Visit each job's URL with a headless browser and extract the full description.
@@ -243,14 +308,24 @@ def fetch_descriptions(jobs: list, on_progress=None) -> List[tuple]:
                     on_progress(i, total, job, desc)
                 continue
 
+            # Indeed: use static HTML fetch (JSON-LD) — Playwright triggers bot detection
+            if source == "indeed":
+                desc = _fetch_indeed_description(job["url"])
+                status = f"{len(desc)} chars" if desc else "no description found"
+                print(f"           → {status} (static fetch)", flush=True)
+                results.append((job["id"], desc))
+                if on_progress:
+                    on_progress(i, total, job, desc)
+                time.sleep(random.uniform(1.0, 2.5))
+                continue
+
             try:
                 page.goto(job["url"], wait_until="domcontentloaded", timeout=25000)
                 time.sleep(random.uniform(1.5, 3.0))
 
-                # Expand "Show more" buttons (LinkedIn + Indeed)
+                # Expand "Show more" buttons (LinkedIn + Dice)
                 for btn_sel in [
                     "button.show-more-less-html__button--more",
-                    "button[id*='indeed-read-more']",
                     "button[data-testid='read-more-button']",
                 ]:
                     try:

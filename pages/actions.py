@@ -300,8 +300,10 @@ def render():
                     show_cli_result(combined, ok1 and ok2 and ok3)
 
                     # ── send notification if email configured ─────────────────
+                    # Use the current slider value — not the saved profile — so
+                    # the user doesn't have to hit "Save" before "Run Pipeline Now"
                     _sched_cfg = load_profile().get("scheduler", {})
-                    _min       = int(_sched_cfg.get("min_score_alert", 70))
+                    _min       = sched_min_score
                     from scheduler import _get_new_high_score_jobs, _send_email
                     # Only look at jobs scraped in the last 60 min (this run)
                     _hits = _get_new_high_score_jobs(_min, since_minutes=60)
