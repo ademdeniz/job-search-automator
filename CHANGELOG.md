@@ -31,7 +31,7 @@ Features in progress or planned for the next version.
 
 ---
 
-## [0.5.0] — 2026-03-XX
+## [0.5.0] — 2026-04-11
 
 ### Added
 - **Skill chips on job cards** — matched skills (✅), missing skills (❌), and suggested keywords (💡) shown on every card after scoring.
@@ -59,7 +59,7 @@ Features in progress or planned for the next version.
 
 ---
 
-## [0.4.0] — 2026-02-XX
+## [0.4.0] — 2026-04-08
 
 ### Added
 - **Cover letter voice pass** — second Claude call rewrites cover letter to match candidate's natural writing style using a writing sample they provide.
@@ -81,7 +81,7 @@ Features in progress or planned for the next version.
 
 ---
 
-## [0.3.0] — 2026-01-XX
+## [0.3.0] — 2026-04-04
 
 ### Added
 - **Resume tailoring** — Claude Sonnet rewrites resume bullets to mirror the job's language using your exact metrics and project names. Outputs `.docx`.
@@ -100,7 +100,7 @@ Features in progress or planned for the next version.
 
 ---
 
-## [0.2.0] — 2025-12-XX
+## [0.2.0] — 2026-04-03
 
 ### Added
 - **Streamlit UI** — full dashboard with Job Board, Dashboard, Actions pages.
@@ -117,7 +117,7 @@ Features in progress or planned for the next version.
 
 ---
 
-## [0.1.0] — 2025-11-XX
+## [0.1.0] — 2026-04-02
 
 ### Added
 - Initial release — scraping (LinkedIn), AI scoring (Claude Haiku), and basic job tracking via CLI.
